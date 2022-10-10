@@ -22,13 +22,13 @@ fn main() {
 	app.use(fn (mut ctx veb.Context) {
 		mut token := ctx.header(.authorization)
 		token = token.after('Bearer ') or {
-            ctx.about(500, "${err}")
-            return
-        }
-        if token.len == 0 {
-            ctx.stop()
-            return
-        }
+		    ctx.about(500, "${err}")
+		    return
+		}
+		if token.len == 0 {
+		    ctx.stop()
+		    return
+		}
 		ctx.next()
 	})
 
