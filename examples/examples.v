@@ -28,7 +28,7 @@ fn main() {
 	mut router := app.group("/:version")
 
 	router.get("/user", fn(mut ctx veb.Context) {
-		ctx.text("/api/user")
+		ctx.text("${ctx.path()} -- ${ctx.param('version')}")
 	})
 
 	app.statics("/statics", ".")
