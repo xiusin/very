@@ -143,21 +143,20 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 }
 
 // 暂不支持， 官方没有给出反射调用方法
-// pub fn (mut app GroupRouter) controller<T>(ctrl T) {
-// 	$for method in T.methods {
-// 		http_methods, route_path := parse_attrs(method.name, method.attrs) or {
-// 			 panic('error parsing method attributes: $err')
-// 			 return
-// 		}
-// 		println(method.typ)
-// 		// app.add(http_methods[0], route_path, ret)
-// 		app.add(http_methods[0], route_path, fn [ctrl, method] (mut ctx Context) {
-// 			println('${ctx.path()}')
-// 			ctrl.$method([]string{len: 0})
-// 			// dump(ret)
-// 		})
-// 	}
-// }
+pub fn (mut app GroupRouter) _controller<T>(ctrl T) {
+	$for method in T.methods {
+		http_methods, route_path := parse_attrs(method.name, method.attrs) or {
+			 panic('error parsing method attributes: $err')
+			 return
+		}
+		// app.add(http_methods[0], route_path, ret)
+		app.add(http_methods[0], route_path, fn [ctrl, method] (mut ctx Context) {
+			println('${ctx.path()}')
+			ctrl.$method([]string{len: 0})
+			// dump(ret)
+		})
+	}
+}
 
 
 // handle 请求处理
