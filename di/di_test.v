@@ -2,12 +2,14 @@ module di
 
 fn test_di() {
 	mut ioc := new()
-	nn := "hello world"
-	ioc.set(Service{
-		name: "service", 
-		instance: &nn
+	ioc.set("dumper", fn (mut b Builder) voidptr {
+		str := "e1313123  cho dumper"
+		return &str
 	})
 
-	info := *&string(ioc.get("service"))
-	dump(info)
+	a := ioc.get<string>("dumper") or {
+		dump('${err}')
+	}
+	println(a)
+
 }

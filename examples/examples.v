@@ -22,7 +22,8 @@ fn main() {
 
 	app.get("/hello/:name", fn(mut ctx veb.Context) {
 		user_id := ctx.value("user_id") as int
-		ctx.json("hello ${ctx.param('name')} ${user_id} ip ${ctx.ip()}")
+		dump(ctx.ip())
+		ctx.json("hello ${ctx.param('name')} ${user_id} ip")
 	})
 
 	mut router := app.group("/:version")
