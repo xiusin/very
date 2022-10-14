@@ -1,6 +1,6 @@
 module veb
 
-fn main() {
+fn main_test() {
 	mut app := new_app(default_configuration())
 
 	app.use(fn(mut ctx Context) {

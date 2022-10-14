@@ -5,6 +5,10 @@ import net.urllib
 import json
 import log
 
+import sqlite
+import mysql
+import pg
+
 pub type Val = int | string | i64 | i8  | u8 | u64 | f64 | nil | rune | byte | []string | []int | []i64 | []byte | []rune | []f64
 
 pub struct Context {
@@ -24,6 +28,7 @@ pub mut:
 	url 		urllib.URL
 	sess  		Session
 	logger    	log.Log
+	db     		&OrmInstance
 }
 
 pub fn (mut ctx Context) next() {
@@ -141,7 +146,7 @@ pub fn (mut ctx Context)body_parse<T>() ?T {
 	return json.decode(T, ctx.req.data)
 }
 
-pub fn (mut ctx Context) ip() string {
+pub fn (mut ctx Context) client_ip() string {
 	mut ip := ctx.req.header.get(.x_forwarded_for) or { '' }
 	if ip == '' {
 		ip = ctx.req.header.get_custom('X-Real-Ip') or { '' }
@@ -149,5 +154,13 @@ pub fn (mut ctx Context) ip() string {
 	if ip.contains(',') {
 		ip = ip.all_before(',')
 	}
+
+	// todo 等待暴露netconn
+
 	return ip
 }
+
+
+
+
+pub fn (mut ctx )

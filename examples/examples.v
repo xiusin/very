@@ -5,6 +5,8 @@ import xiusin.veb
 fn main() {
 	mut app := veb.new_app(veb.default_configuration())
 
+	app.db = sqlite.connect(':memoryaaa:') or { panic(err) }
+
 	app.use(fn(mut ctx veb.Context) {
 		ctx.next()
 	})

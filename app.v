@@ -7,6 +7,7 @@ import os
 import vweb
 
 type VebHandler = fn(mut ctx Context)
+type OrmInstance = sqlite.DB | mysql.DB | pg.DB
 
 struct GroupRouter {
 mut:
@@ -25,6 +26,7 @@ pub mut:
 	logger 				log.Log
 	recover_handler 	VebHandler
 	not_found_handler 	VebHandler
+	db     				OrmInstance
 }
 
 // 获取一个VebApp实例
@@ -170,6 +172,7 @@ fn (mut app VebApp) handle(req Request) Response {
 		req: req
 		url: url
 		resp: Response{}
+		db: &app.db
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}
