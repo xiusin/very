@@ -7,7 +7,7 @@ import entities
 struct Contrller {
 mut:
 	userid int
-	ctx &veb.Context
+	ctx &veb.Context = unsafe { nil }
 }
 
 pub fn (mut c Contrller) success() {
@@ -78,7 +78,7 @@ fn main() {
 
 	app.statics("/statics", ".")
 
-	app.controller(mut Contrller{ctx: unsafe{nil}})
+	app.controller(mut Contrller{})
 
 	app.run()
 }

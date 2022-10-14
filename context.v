@@ -4,7 +4,6 @@ import net.http
 import net.urllib
 import json
 import log
-// import orm
 
 pub type Val = int | string | i64 | i8  | u8 | u64 | f64 | nil | rune | byte | []string | []int | []i64 | []byte | []rune | []f64
 
@@ -17,6 +16,7 @@ mut:
 	resp 		http.Response
 	query 		map[string]string
 	form  		map[string]string
+	files		map[string][]http.FileData
 	params		map[string]string
 	values 		map[string]Val
 pub mut:
@@ -26,7 +26,6 @@ pub mut:
 	sess  		Session
 	logger    	log.Log
 	db     		Orm
-	// inner_db    orm.Connection
 }
 
 pub fn (mut ctx Context) next() {
@@ -92,6 +91,29 @@ pub fn (mut ctx Context) html(result string) {
 
 pub fn(mut ctx Context) query(key string) string {
 	return ctx.query[key] or { '' }
+}
+
+pub fn (mut ctx Context) file(name string) ?[]http.FileData  {
+	// http.parse_multipart_form()
+	return ctx.files[name] or {
+		return error("不存在上传文件")
+	}
+}
+
+pub fn (mut ctx Context) form(name string) string {
+	return ctx.form[name] or { '' }
+}
+
+pub fn (mut ctx Context) parse_form() ? {
+	if ctx.form.len == 0 {
+		ctx.form, ctx.files = parse_form_from_request(ctx.req) or {
+			return err
+		}
+	}
+}
+
+pub fn (mut ctx Context) redirect(url string) {
+	ctx.resp.header.add(.location, url)
 }
 
 pub fn (mut ctx Context) param(key string) string {

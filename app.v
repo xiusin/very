@@ -29,7 +29,6 @@ pub mut:
 	recover_handler 	VebHandler
 	not_found_handler 	VebHandler
 	db     				Orm		
-	// inner_db			orm.Connection
 }
 
 // 获取一个VebApp实例
@@ -56,10 +55,6 @@ pub fn new_app(cfg Configuration) VebApp {
 pub fn (mut app VebApp) use_db(mut db Orm) {
 	app.db = db
 } 
-
-// pub fn (mut app VebApp) use_inner_db(mut db orm.Connection) {
-// 	app.inner_db = unsafe{ &db }
-// } 
 
 // 注册中间件
 pub fn (mut app GroupRouter) use(mw VebHandler) {
@@ -162,7 +157,6 @@ pub fn (mut app GroupRouter) controller<T>(mut instance T) {
 			 panic('解析方法`${method.name}`属性错误: $err')
 			 return
 		}
-		
 		name := method.name
 		app.add(http_methods[0], route_path, fn [mut instance, name] <T> (mut ctx Context) {
 			mut ctrl := instance // replace with .clone()
@@ -192,7 +186,6 @@ fn (mut app VebApp) handle(req Request) Response {
 		url: url
 		resp: Response{}
 		db: &app.db
-		// inner_db: app.inner_db
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}

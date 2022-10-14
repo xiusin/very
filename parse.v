@@ -2,6 +2,8 @@ module veb
 
 import net.http
 
+const methods_with_form = [http.Method.post, .put, .patch]
+
 // @from vlib/vweb/parse.v
 fn parse_attrs(name string, attrs []string) ?([]http.Method, string) {
 	if attrs.len == 0 {
@@ -44,4 +46,23 @@ fn parse_attrs(name string, attrs []string) ?([]http.Method, string) {
 	}
 	// Make path lowercase for case-insensitive comparisons
 	return methods, path.to_lower()
+}
+
+
+fn parse_form_from_request(request http.Request) ?(map[string]string, map[string][]http.FileData) {
+	mut form := map[string]string{}
+	mut files := map[string][]http.FileData{}
+	if request.method in methods_with_form {
+		ct := request.header.get(.content_type) or { '' }.split(';').map(it.trim_left(' \t'))
+		if 'multipart/form-data' in ct {
+			boundary := ct.filter(it.starts_with('boundary='))
+			if boundary.len != 1 {
+				return error('detected more that one form-data boundary')
+			}
+			form, files = http.parse_multipart_form(request.data, boundary[0][9..])
+		} else {
+			form = http.parse_form(request.data)
+		}
+	}
+	return form, files
 }
