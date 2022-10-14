@@ -7,10 +7,9 @@ import os
 import vweb
 import sqlite
 import mysql
-import pg
 
 type VebHandler = fn(mut ctx Context)
-type OrmInstance = sqlite.DB | mysql.DB | pg.DB
+type Orm = sqlite.DB | mysql.Connection 
 
 struct GroupRouter {
 mut:
@@ -29,7 +28,8 @@ pub mut:
 	logger 				log.Log
 	recover_handler 	VebHandler
 	not_found_handler 	VebHandler
-	db     				OrmInstance
+	db     				Orm		
+	// inner_db			orm.Connection
 }
 
 // 获取一个VebApp实例
@@ -52,6 +52,14 @@ pub fn new_app(cfg Configuration) VebApp {
 	app.Server.port = app.cfg.get_port()
 	return app
 }
+
+pub fn (mut app VebApp) use_db(mut db Orm) {
+	app.db = db
+} 
+
+// pub fn (mut app VebApp) use_inner_db(mut db orm.Connection) {
+// 	app.inner_db = unsafe{ &db }
+// } 
 
 // 注册中间件
 pub fn (mut app GroupRouter) use(mw VebHandler) {
@@ -147,22 +155,30 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	})
 }
 
-// 暂不支持， 官方没有给出反射调用方法
-pub fn (mut app GroupRouter) _controller<T>(ctrl T) {
+pub fn (mut app GroupRouter) controller<T>(mut instance T) {
+	// TODO 判断T是否包含有ctx属性
 	$for method in T.methods {
 		http_methods, route_path := parse_attrs(method.name, method.attrs) or {
-			 panic('error parsing method attributes: $err')
+			 panic('解析方法`${method.name}`属性错误: $err')
 			 return
 		}
-		// app.add(http_methods[0], route_path, ret)
-		app.add(http_methods[0], route_path, fn [ctrl, method] (mut ctx Context) {
-			println('${ctx.path()}')
-			ctrl.$method([]string{len: 0})
-			// dump(ret)
+		
+		name := method.name
+		app.add(http_methods[0], route_path, fn [mut instance, name] <T> (mut ctx Context) {
+			mut ctrl := instance // replace with .clone()
+			ctrl.ctx = unsafe { ctx }
+
+			// TODO 注入其他属性
+			$for method in T.methods {
+				if method.name == name {
+					// FIXME error: invalid string method call: expected `string`, not `FunctionData`
+					ctrl.$method() // 调用名称必须为 `method`
+					return 
+				} 
+			}
 		})
 	}
 }
-
 
 // handle 请求处理
 fn (mut app VebApp) handle(req Request) Response {
@@ -176,6 +192,7 @@ fn (mut app VebApp) handle(req Request) Response {
 		url: url
 		resp: Response{}
 		db: &app.db
+		// inner_db: app.inner_db
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}

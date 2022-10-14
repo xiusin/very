@@ -7,3 +7,6 @@ examples
 *.dylib
 *.dll
 vls.log
+*.db
+examples.dSYM
+test.v

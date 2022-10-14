@@ -4,6 +4,7 @@ import net.http
 import net.urllib
 import json
 import log
+// import orm
 
 pub type Val = int | string | i64 | i8  | u8 | u64 | f64 | nil | rune | byte | []string | []int | []i64 | []byte | []rune | []f64
 
@@ -24,7 +25,8 @@ pub mut:
 	url 		urllib.URL
 	sess  		Session
 	logger    	log.Log
-	db     		&OrmInstance
+	db     		Orm
+	// inner_db    orm.Connection
 }
 
 pub fn (mut ctx Context) next() {
