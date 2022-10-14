@@ -155,8 +155,3 @@ pub fn (mut ctx Context) client_ip() string {
 
 	return ip
 }
-
-
-
-
-pub fn (mut ctx )
