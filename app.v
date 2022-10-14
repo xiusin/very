@@ -5,6 +5,9 @@ import net.urllib
 import log
 import os
 import vweb
+import sqlite
+import mysql
+import pg
 
 type VebHandler = fn(mut ctx Context)
 type OrmInstance = sqlite.DB | mysql.DB | pg.DB

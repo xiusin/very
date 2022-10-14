@@ -5,10 +5,6 @@ import net.urllib
 import json
 import log
 
-import sqlite
-import mysql
-import pg
-
 pub type Val = int | string | i64 | i8  | u8 | u64 | f64 | nil | rune | byte | []string | []int | []i64 | []byte | []rune | []f64
 
 pub struct Context {
