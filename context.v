@@ -121,7 +121,7 @@ pub fn (mut ctx Context) param(key string) string {
 }
 
 pub fn (mut ctx Context) host() string {
-	return '${ctx.url.scheme}://${ctx.url.host}'
+	return ctx.url.host
 }
 
 pub fn (mut ctx Context) path() string {

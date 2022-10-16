@@ -114,7 +114,11 @@ pub fn (mut app GroupRouter) all(path string, handle VebHandler, mws ...VebHandl
 // get_with_prefix 获取带前缀的路由path
 fn (mut app GroupRouter) get_with_prefix(key string) string {
 	if key.starts_with('/') {
-		return '${app.prefix}${key}'
+		if key == '/' {
+			return '${app.prefix}*filepath'
+		} else {
+			return '${app.prefix}${key}'
+		}
 	} else {
 		return '${app.prefix}/${key}'
 	}
@@ -129,25 +133,50 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...VebHandler) &GroupRoute
 	}
 }
 
+fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file string) {
+	cfn := fn (dir string, index_file string) fn (mut ctx Context) {
+			return fn [dir, index_file] (mut ctx Context) {
+				mut filepath := ctx.param('filepath')
+				if index_file.len > 0 && filepath.len == 0 {
+					filepath = index_file
+				}
+				file := dir.trim('/') + '/' + filepath
+				data := os.read_file(file) or {
+					eprintln("read file ${file} ${err}")
+					ctx.abort(500, '${err}')
+					return
+				}
+				ext := os.file_ext(file)
+				if ext in vweb.mime_types {
+					ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+				}
+				ctx.resp.body = data
+			}
+	}
+
+	files := os.ls(dir) or {
+		panic(err)
+	}
+	// 注册处理方法
+	app.all("${prefix}/*filepath", cfn(dir, index_file))
+	for file in files {
+		f_dir := os.join_path(dir, file)
+		if os.is_dir(f_dir) {
+			app.deep_register(f_dir, '${prefix}/${file}', index_file)
+			
+			// 注册本级目录处理方法
+			app.all("${prefix}/${file}/*filepath", cfn(f_dir, index_file))
+		}
+	}
+}
+
 // statics 静态文件处理
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
-	app.all(prefix + "/*filepath", fn [dir, index_file] (mut ctx Context) {
-		mut filepath := ctx.param('filepath')
-		if filepath.len == 0 && index_file.len > 0 {
-			filepath = index_file[0]
-		}
-		ffile := dir.trim('/') + '/' + filepath
-
-		data := os.read_file(ffile) or {
-			ctx.abort(500, '${err}')
-			return
-		}
-		ext := os.file_ext(ffile)
-		if ext in vweb.mime_types {
-			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
-		}
-		ctx.resp.body = data
-	})
+	app.deep_register(
+		dir, 
+		if prefix == '/' { '' } else {  prefix }, 
+		if index_file.len > 0 { index_file[0] } else { '' }
+	)
 }
 
 pub fn (mut app GroupRouter) controller<T>(mut instance T) {
@@ -176,11 +205,11 @@ pub fn (mut app GroupRouter) controller<T>(mut instance T) {
 
 // handle 请求处理
 fn (mut app VebApp) handle(req Request) Response {
-	url := urllib.parse(req.url) or {
+	mut url := urllib.parse(req.url) or {
 		return Response{ body: '${err}' }
 	}
-
-	key := req.method.str() + ";" + url.path
+	url.host = req.header.get(.host) or { '' }
+	key := req.method.str() + ";" + url.path 
 	mut ctx := Context {
 		req: req
 		url: url

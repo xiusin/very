@@ -8,5 +8,6 @@ examples
 *.dll
 vls.log
 *.db
-examples.dSYM
+*.dSYM
 test.v
+statics

@@ -73,3 +73,7 @@ pub fn (t Node) depth() int {
 pub fn (t Node) handler_fn() VebHandler {
 	return t.handler
 }
+
+pub fn (t Node) str() string {
+	return "path:${t.path} pattern: ${t.is_pattern} is_term: ${t.term}"
+}

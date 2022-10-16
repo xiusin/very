@@ -58,7 +58,6 @@ pub fn (mut t Trier) add(key string, handler VebHandler, mws []VebHandler) &Node
 				node = node.new_child(segment, "", nil, false, false)
 				node.set_pattern(is_pattern, segment, param_name)
 			}
-
 			node.term_count++
 		}
 
@@ -98,9 +97,7 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 			return node
 		}
 	}
-
 	mut children := node.children()
-
 	mut n :=  &Node{ parent: unsafe { nil }, re: unsafe { nil }}
 
 	if segments[0] !in children {
@@ -109,12 +106,20 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 			if !children[m].is_pattern {
 				continue
 			}
-
-			res := children[m].re.find_all_str(segments[0])
-			if res.len > 0 {
+			mut child := children[m]
+			// 检查是否可以匹配路由
+			if child.re.matches_string(segments[0]) {
+				
+				// 查找路由内容
+				res := child.re.find_all_str(segments[0])
 				flag = true
-				params[children[m].param_name] = res[0]
-				unsafe { n = children[m] }
+				if child.param_name.len > 0 {
+					params[child.param_name] = ''
+					if res.len > 0 {
+						params[child.param_name] = res[0]
+					} 
+				}
+				unsafe { n = child }
 				break
 			}
 		}
@@ -126,7 +131,6 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 	}
 
 	mut nsegments := []string{}
-
 	if segments.len > 1 {
 		nsegments = segments[1..]
 	}
