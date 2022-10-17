@@ -24,7 +24,7 @@ fn (mut s Session) load() {
 	s.data = store.get(s.get_id())
 }
 
-fn (mut s Session) sync() {
+pub fn (mut s Session) sync() {
 	store.set(s.get_id(), s.data.clone(), 3600)
 }
 

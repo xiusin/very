@@ -2,6 +2,7 @@ module very
 
 import net.http
 import net.urllib
+import very.session
 import json
 import log
 
@@ -24,7 +25,7 @@ pub mut:
 	mws 		[]Handler
 	handler 	Handler
 	url 		urllib.URL
-	sess  		Session
+	sess  		session.Session
 	logger    	log.Log
 	db     		Orm
 }
