@@ -13,8 +13,8 @@ mut:
 	is_group 	bool
 	children 	map[string]&Node
 	is_pattern  bool
-	re 			&regex.RE
-	parent   	&Node
+	re 			&regex.RE = unsafe { nil }
+	parent   	&Node = unsafe { nil }
 	mws 		[]VebHandler
 	handler 	VebHandler
 	term_count 	int
@@ -29,9 +29,7 @@ pub fn (mut t Node) new_child(val string, path string, handler VebHandler, term 
 			depth: t.depth + 1
 			is_group: is_group
 			handler: handler
-			children: map[string]&Node{},
-			parent: nil
-			re: nil
+			children: map[string]&Node{}
 		}
 
 		t.children[node.val] = node

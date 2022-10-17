@@ -13,8 +13,6 @@ pub fn new_trie() &Trier {
 		root: &Node{
 			depth: 0
 			children: map[string]&Node{}
-			parent: unsafe { nil }
-			re: unsafe { nil }
 		}
 		size: 0
 	}
@@ -98,7 +96,7 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 		}
 	}
 	mut children := node.children()
-	mut n :=  &Node{ parent: unsafe { nil }, re: unsafe { nil }}
+	mut n :=  &Node{}
 
 	if segments[0] !in children {
 		mut flag := false
