@@ -1,4 +1,4 @@
-module veb
+module very
 
 import net.http { CommonHeader, Request, Response, Server, Status }
 import net.urllib
@@ -33,7 +33,7 @@ pub mut:
 }
 
 // 获取一个Application实例
-pub fn new_app(cfg Configuration) Application {
+pub fn new(cfg Configuration) Application {
 	mut app := Application{
 		Server: Server{}
 		cfg: cfg

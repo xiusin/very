@@ -1,4 +1,4 @@
-module veb
+module session
 
 import rand
 

@@ -1,6 +1,6 @@
 module main
 
-import xiusin.veb
+import xiusin.very
 import sqlite
 import entities
 
@@ -11,7 +11,7 @@ pub struct ApiResponse<T> {
 }
 
 fn main() {
-	mut app := veb.new_app(veb.default_configuration())
+	mut app := very.new(very.default_configuration())
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
@@ -22,7 +22,7 @@ fn main() {
 	}
 
 	mut api := app.group("/api")
-	api.get("/article/list", fn (mut ctx veb.Context) {
+	api.get("/article/list", fn (mut ctx very.Context) {
 		mut db := ctx.db as sqlite.DB
 		result := sql db {
 			select from entities.Article
@@ -36,7 +36,7 @@ fn main() {
 		})
 	})
 
-	api.post("/article/save", fn(mut ctx veb.Context) {
+	api.post("/article/save", fn(mut ctx very.Context) {
 		ctx.text(ctx.host())
 	})
 

@@ -1,4 +1,4 @@
-module veb
+module very
 
 pub struct Trier {
 mut:

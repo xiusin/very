@@ -1,13 +1,13 @@
 module main
 
-import xiusin.veb
+import xiusin.very
 import sqlite
 import entities
 
 struct Contrller {
 mut:
 	userid int
-	ctx &veb.Context = unsafe { nil }
+	ctx &very.Context = unsafe { nil }
 }
 
 pub fn (mut c Contrller) success() {
@@ -27,7 +27,7 @@ pub fn (mut c Contrller) success1() {
 	}
 }
 fn main() {
-	mut app := veb.new_app(veb.default_configuration())
+	mut app := very.new(very.default_configuration())
 
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
@@ -39,22 +39,22 @@ fn main() {
 
 	app.use_db(mut db)
 	// app.use_inner_db(mut db)
-	app.use(fn(mut ctx veb.Context) {
+	app.use(fn(mut ctx very.Context) {
 		ctx.next()
 	})
 
-	app.use(fn (mut ctx veb.Context) {
+	app.use(fn (mut ctx very.Context) {
 		mut token := ctx.header(.authorization)
 		token = token.after('Bearer ')
 		ctx.next()
 	})
 
-	app.use(fn (mut ctx veb.Context) {
+	app.use(fn (mut ctx very.Context) {
 		ctx.set("user_id", 1)
 		ctx.next()
 	})
 
-	app.get("/hello/:name", fn(mut ctx veb.Context) {
+	app.get("/hello/:name", fn(mut ctx very.Context) {
 		user := entities.User{
 			username: "xiusin"
 			password: "123456"
@@ -72,7 +72,7 @@ fn main() {
 
 	mut router := app.group("/:version")
 
-	router.get("/user", fn(mut ctx veb.Context) {
+	router.get("/user", fn(mut ctx very.Context) {
 		ctx.text("${ctx.path()} -- ${ctx.param('version')}")
 	})
 

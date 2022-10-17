@@ -1,4 +1,4 @@
-module veb
+module very
 
 import net.http
 import net.urllib

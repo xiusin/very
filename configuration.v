@@ -1,5 +1,6 @@
-module veb
+module very
 
+[heap; init]
 struct Configuration {
 mut:
 	port         int    = 8080
