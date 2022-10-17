@@ -19,9 +19,10 @@ mut:
 	files		map[string][]http.FileData
 	params		map[string]string
 	values 		map[string]Val
+	app 		&Application = unsafe { nil }
 pub mut:
-	mws 		[]VebHandler
-	handler 	VebHandler
+	mws 		[]Handler
+	handler 	Handler
 	url 		urllib.URL
 	sess  		Session
 	logger    	log.Log

@@ -8,17 +8,18 @@ import vweb
 import sqlite
 import mysql
 
-type VebHandler = fn(mut ctx Context)
+type Handler = fn(mut ctx Context)
 type Orm = sqlite.DB | mysql.Connection 
 
 struct GroupRouter {
 mut:
 	trier 				&Trier
-	mws 				[]VebHandler
+	mws 				[]Handler
 	prefix 				string
 }
 
-struct VebApp {
+[heap]
+struct Application {
 	Server
 	GroupRouter
 mut:
@@ -26,14 +27,14 @@ mut:
 
 pub mut:
 	logger 				log.Log
-	recover_handler 	VebHandler
-	not_found_handler 	VebHandler
+	recover_handler 	Handler
+	not_found_handler 	Handler
 	db     				Orm		
 }
 
-// 获取一个VebApp实例
-pub fn new_app(cfg Configuration) VebApp {
-	mut app := VebApp{
+// 获取一个Application实例
+pub fn new_app(cfg Configuration) Application {
+	mut app := Application{
 		Server: Server{}
 		cfg: cfg
 		trier: new_trie()
@@ -52,59 +53,59 @@ pub fn new_app(cfg Configuration) VebApp {
 	return app
 }
 
-pub fn (mut app VebApp) use_db(mut db Orm) {
+pub fn (mut app Application) use_db(mut db Orm) {
 	app.db = db
 } 
 
 // 注册中间件
-pub fn (mut app GroupRouter) use(mw VebHandler) {
+pub fn (mut app GroupRouter) use(mw Handler) {
 	app.mws << mw
 }
 
-pub fn (mut app GroupRouter) get(path string, handle VebHandler, mws ...VebHandler)  {
+pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler)  {
 	fk := "GET;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 	app.head(path, handle, ...mws)
 }
 
-pub fn (mut app GroupRouter) post(path string, handle VebHandler, mws ...VebHandler)  {
+pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler)  {
 	fk := "POST;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 	app.head(path, handle, ...mws)
 }
 
 
-pub fn (mut app GroupRouter) options(path string, handle VebHandler, mws ...VebHandler)  {
+pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler)  {
 	fk := "OPTIONS;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 	app.head(path, handle, ...mws)
 }
 
-pub fn (mut app GroupRouter) put(path string, handle VebHandler, mws ...VebHandler)  {
+pub fn (mut app GroupRouter) put(path string, handle Handler, mws ...Handler)  {
 	fk := "PUT;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 	app.head(path, handle, ...mws)
 }
 
-pub fn (mut app GroupRouter) delete(path string, handle VebHandler, mws ...VebHandler)  {
+pub fn (mut app GroupRouter) delete(path string, handle Handler, mws ...Handler)  {
 	fk := "DELETE;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 	app.head(path, handle, ...mws)
 }
 
-pub fn (mut app GroupRouter) head(path string, handle VebHandler, mws ...VebHandler) {
+pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
 	fk := "HEAD;" +  app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 }
 
 // add 添加一个路由
-pub fn (mut app GroupRouter) add(method http.Method, path string, handle VebHandler, mws ...VebHandler) {
+pub fn (mut app GroupRouter) add(method http.Method, path string, handle Handler, mws ...Handler) {
 	fk := method.str() + ";" +  app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
 }
 
 // all 注册所有请求方法
-pub fn (mut app GroupRouter) all(path string, handle VebHandler, mws ...VebHandler) {
+pub fn (mut app GroupRouter) all(path string, handle Handler, mws ...Handler) {
 	app.add(.get, path, handle, ...mws)
 	app.add(.post, path, handle, ...mws)
 	app.add(.delete, path, handle, ...mws)
@@ -125,7 +126,7 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 }
 
 // group 获取一个路由分组
-pub fn (mut app GroupRouter) group(prefix string, mws ...VebHandler) &GroupRouter {
+pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return &GroupRouter {
 		trier: app.trier
 		mws: mws
@@ -204,37 +205,42 @@ pub fn (mut app GroupRouter) controller<T>(mut instance T) {
 }
 
 // handle 请求处理
-fn (mut app VebApp) handle(req Request) Response {
+fn (mut app Application) handle(req Request) Response {
+	// defer {
+	// 	app.recover_handler()
+	// }
+
 	mut url := urllib.parse(req.url) or {
 		return Response{ body: '${err}' }
 	}
 	url.host = req.header.get(.host) or { '' }
 	key := req.method.str() + ";" + url.path 
-	mut ctx := Context {
+	mut req_ctx := Context {
 		req: req
 		url: url
 		resp: Response{}
 		db: &app.db
+		app: &app
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}
 
 	node, params, ok := app.trier.find(key)
-	ctx.params = params.clone()
+	req_ctx.params = params.clone()
 	if !ok {
-		app.not_found_handler(mut ctx)
+		app.not_found_handler(mut req_ctx)
 	} else {
-		ctx.handler = node.handler_fn()
-		ctx.mws = app.mws
-		ctx.mws << node.mws
-		ctx.next()
+		req_ctx.handler = node.handler_fn()
+		req_ctx.mws = app.mws
+		req_ctx.mws << node.mws
+		req_ctx.next()
 	}
 
-	return ctx.resp
+	return req_ctx.resp
 }
 
-// run 启动vebapp服务
-pub fn (mut app VebApp) run() {
+// run 启动Application服务
+pub fn (mut app Application) run() {
 	app.Server.handler = app
 	print('[Pine for V] ')
 	app.Server.listen_and_serve() or {

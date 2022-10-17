@@ -15,12 +15,12 @@ mut:
 	is_pattern  bool
 	re 			&regex.RE = unsafe { nil }
 	parent   	&Node = unsafe { nil }
-	mws 		[]VebHandler
-	handler 	VebHandler
+	mws 		[]Handler
+	handler 	Handler
 	term_count 	int
 }
 
-pub fn (mut t Node) new_child(val string, path string, handler VebHandler, term bool, is_group bool) &Node {
+pub fn (mut t Node) new_child(val string, path string, handler Handler, term bool, is_group bool) &Node {
 	unsafe {
 		node := &Node{
 			val: val
@@ -68,7 +68,7 @@ pub fn (t Node) depth() int {
 	return t.depth
 }
 
-pub fn (t Node) handler_fn() VebHandler {
+pub fn (t Node) handler_fn() Handler {
 	return t.handler
 }
 

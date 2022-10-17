@@ -22,7 +22,7 @@ pub fn (mut t Trier) root() &Node {
 	return t.root
 }
 
-pub fn (mut t Trier) add(key string, handler VebHandler, mws []VebHandler) &Node {
+pub fn (mut t Trier) add(key string, handler Handler, mws []Handler) &Node {
 	unsafe {
 		t.size++
 		segments := key.split("/")
