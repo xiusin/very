@@ -206,10 +206,6 @@ pub fn (mut app GroupRouter) controller<T>(mut instance T) {
 
 // handle 请求处理
 fn (mut app Application) handle(req Request) Response {
-	// defer {
-	// 	app.recover_handler()
-	// }
-
 	mut url := urllib.parse(req.url) or {
 		return Response{ body: '${err}' }
 	}
@@ -219,9 +215,7 @@ fn (mut app Application) handle(req Request) Response {
 		req: req
 		url: url
 		resp: Response{}
-		// db: &app.db
 		di: &app.di
-		app: &app
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}

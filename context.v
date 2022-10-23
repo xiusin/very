@@ -21,7 +21,6 @@ mut:
 	files		map[string][]http.FileData
 	params		map[string]string
 	values 		map[string]Val
-	app 		&Application = unsafe { nil }
 pub mut:
 	mws 		[]Handler
 	handler 	Handler
@@ -29,14 +28,9 @@ pub mut:
 	sess  		session.Session
 	logger    	log.Log
 	di 			&di.Builder = unsafe { nil }
-	// db     		Orm
 }
 
-pub fn (mut ctx Context) di() &di.Builder {
-	return &ctx.app.di
-}
-
-pub fn (mut ctx Context) next() ? {
+pub fn (mut ctx Context) next()? {
 	if ctx.is_stopped {
 		return
 	}
@@ -57,11 +51,11 @@ pub fn (mut ctx Context) is_stopped() bool {
 	return ctx.is_stopped
 }
 
-pub fn (mut ctx Context) handle() ?{
+pub fn (mut ctx Context) handle()? {
 	defer {
 		ctx.sess.sync()
 	}
-	ctx.handler(mut ctx) ?
+	ctx.handler(mut ctx)?
 }
 
 pub fn (mut ctx Context) set_status(status_code int) {
