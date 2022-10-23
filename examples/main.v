@@ -3,6 +3,7 @@ module main
 import xiusin.very
 import sqlite
 import entities
+import xiusin.very.di
 
 pub struct ApiResponse<T> {
 	code int
@@ -12,18 +13,19 @@ pub struct ApiResponse<T> {
 
 fn main() {
 	mut app := very.new(very.default_configuration())
+
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
-	app.use_db(mut db)
+	app.di.set(di.Service{"db", &db})
 
 	sql db {
 		create table entities.Article
 	}
 
 	mut api := app.group("/api")
-	api.get("/article/list", fn (mut ctx very.Context) {
-		mut db := ctx.db as sqlite.DB
+	api.get("/article/list", fn (mut ctx very.Context) ? {
+		mut db := ctx.di.get<sqlite.DB>("db")?
 		result := sql db {
 			select from entities.Article
 		} or {
@@ -36,7 +38,7 @@ fn main() {
 		})
 	})
 
-	api.post("/article/save", fn(mut ctx very.Context) {
+	api.post("/article/save", fn(mut ctx very.Context) ? {
 		ctx.text(ctx.host())
 	})
 

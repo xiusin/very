@@ -5,11 +5,10 @@ import net.urllib
 import log
 import os
 import vweb
-import sqlite
-import mysql
+import very.di
 
-type Handler = fn(mut ctx Context)
-type Orm = sqlite.DB | mysql.Connection 
+type Handler = fn(mut ctx Context) ?
+// type Orm = sqlite.DB | mysql.Connection 
 
 struct GroupRouter {
 mut:
@@ -19,7 +18,7 @@ mut:
 }
 
 [heap]
-struct Application {
+pub struct Application {
 	Server
 	GroupRouter
 mut:
@@ -29,7 +28,8 @@ pub mut:
 	logger 				log.Log
 	recover_handler 	Handler
 	not_found_handler 	Handler
-	db     				Orm		
+	// db     				Orm		
+	di					di.Builder
 }
 
 // 获取一个Application实例
@@ -41,7 +41,7 @@ pub fn new(cfg Configuration) Application {
 		logger: log.Log{
 			level: .debug
 		}
-		not_found_handler: fn (mut ctx Context) {
+		not_found_handler: fn (mut ctx Context) ? {
 			ctx.resp = Response {
 				body: "the router ${ctx.req.url} not found"
 				status_code: Status.not_found.int()
@@ -53,9 +53,9 @@ pub fn new(cfg Configuration) Application {
 	return app
 }
 
-pub fn (mut app Application) use_db(mut db Orm) {
-	app.db = db
-} 
+// pub fn (mut app Application) use_db(mut db Orm) {
+// 	app.db = db
+// } 
 
 // 注册中间件
 pub fn (mut app GroupRouter) use(mw Handler) {
@@ -135,8 +135,8 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 }
 
 fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file string) {
-	cfn := fn (dir string, index_file string) fn (mut ctx Context) {
-			return fn [dir, index_file] (mut ctx Context) {
+	cfn := fn (dir string, index_file string) fn (mut ctx Context)? {
+			return fn [dir, index_file] (mut ctx Context)? {
 				mut filepath := ctx.param('filepath')
 				if index_file.len > 0 && filepath.len == 0 {
 					filepath = index_file
@@ -219,7 +219,8 @@ fn (mut app Application) handle(req Request) Response {
 		req: req
 		url: url
 		resp: Response{}
-		db: &app.db
+		// db: &app.db
+		di: &app.di
 		app: &app
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
@@ -228,12 +229,12 @@ fn (mut app Application) handle(req Request) Response {
 	node, params, ok := app.trier.find(key)
 	req_ctx.params = params.clone()
 	if !ok {
-		app.not_found_handler(mut req_ctx)
+		app.not_found_handler(mut req_ctx) or { return Response{ body: '${err}' } }
 	} else {
 		req_ctx.handler = node.handler_fn()
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next()
+		req_ctx.next() or { return Response{ body: '${err}' } }
 	}
 
 	return req_ctx.resp

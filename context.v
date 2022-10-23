@@ -5,6 +5,7 @@ import net.urllib
 import very.session
 import json
 import log
+import di
 
 pub type Val = int | string | i64 | i8  | u8 | u64 | f64 | nil | rune | byte | []string | []int | []i64 | []byte | []rune | []f64
 
@@ -27,18 +28,24 @@ pub mut:
 	url 		urllib.URL
 	sess  		session.Session
 	logger    	log.Log
-	db     		Orm
+	di 			&di.Builder = unsafe { nil }
+	// db     		Orm
 }
 
-pub fn (mut ctx Context) next() {
+pub fn (mut ctx Context) di() &di.Builder {
+	return &ctx.app.di
+}
+
+pub fn (mut ctx Context) next() ? {
 	if ctx.is_stopped {
 		return
 	}
 	ctx.mw_index++
 	if ctx.mw_index == ctx.mws.len {
-		ctx.handle()
+		ctx.handle()?
 	} else {
-		ctx.mws[ctx.mw_index](mut ctx)
+		mw := ctx.mws[ctx.mw_index]
+		mw(mut ctx)?
 	}
 }
 
@@ -50,11 +57,11 @@ pub fn (mut ctx Context) is_stopped() bool {
 	return ctx.is_stopped
 }
 
-pub fn (mut ctx Context) handle() {
+pub fn (mut ctx Context) handle() ?{
 	defer {
 		ctx.sess.sync()
 	}
-	ctx.handler(mut ctx)
+	ctx.handler(mut ctx) ?
 }
 
 pub fn (mut ctx Context) set_status(status_code int) {

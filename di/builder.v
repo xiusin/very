@@ -1,27 +1,26 @@
 module di
 
-pub struct Builder  {
+[head]
+pub struct Builder {
 mut:
-    services shared map[string]Service
+	services shared map[string]Service
 }
 
-pub fn new() Builder {
-	return Builder {
-		services:  map[string]Service{}
-	}
-}
-
+// 必须设置引用类型
 pub fn (mut b Builder) set(service Service) {
 	lock b.services {
 		b.services[service.name] = service
 	}
 }
 
-
-pub fn (mut b Builder) get(name string) voidptr {
+pub fn (mut b Builder) get<T>(name string) ?&T {
 	lock b.services {
-		return b.services[name].instance 
+		val := b.services[name].instance
+		match val {
+			T { return val } 
+			else {}
+		}
 	}
-
-	return unsafe { nil }
+	
+	return error("未找到服务${name}")
 }
