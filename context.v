@@ -83,9 +83,9 @@ pub fn (mut ctx Context) text(result string) {
 	ctx.resp.body = result
 }
 
-pub fn (mut ctx Context) bytes(result []byte) {
-	ctx.resp.body = result.str()
-}
+// pub fn (mut ctx Context) bytes(result []byte) {
+// 	ctx.resp.body = result.str()
+// }
 
 pub fn (mut ctx Context) html(result string) {
 	ctx.resp.header.add(.content_type, "text/html")

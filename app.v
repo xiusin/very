@@ -238,7 +238,5 @@ fn (mut app Application) handle(req Request) Response {
 pub fn (mut app Application) run() {
 	app.Server.handler = app
 	print('[Pine for V] ')
-	app.Server.listen_and_serve() or {
-		panic(err)
-	}
+	app.Server.listen_and_serve() 
 }
