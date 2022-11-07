@@ -4,7 +4,7 @@ import time
 
 struct StoreItem {
 	expire_time time.Time
-	data    map[string]string
+	data        map[string]string
 }
 
 pub struct SessionStore {
@@ -19,7 +19,7 @@ const (
 )
 
 fn init() {
-	go fn () {
+	spawn fn () {
 		for {
 			lock store.data {
 				for sess_id, item in store.data {
