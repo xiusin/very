@@ -83,7 +83,7 @@ pub fn (mut t Trier) find(key string) (&Node , map[string]string, bool) {
 	}
 }
 
-// 查找树节点
+// find_node 查找树节点
 fn find_node(node &Node, segments []string, mut params &map[string]string) &Node {
 	unsafe {
 		if node == nil {
@@ -107,7 +107,7 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 			mut child := children[m]
 			// 检查是否可以匹配路由
 			if child.re.matches_string(segments[0]) {
-				
+
 				// 查找路由内容
 				res := child.re.find_all_str(segments[0])
 				flag = true
@@ -115,7 +115,7 @@ fn find_node(node &Node, segments []string, mut params &map[string]string) &Node
 					params[child.param_name] = ''
 					if res.len > 0 {
 						params[child.param_name] = res[0]
-					} 
+					}
 				}
 				unsafe { n = child }
 				break

@@ -6,9 +6,10 @@ import log
 import os
 import vweb
 import very.di
+import orm
 
 type Handler = fn(mut ctx Context) ?
-// type Orm = sqlite.DB | mysql.Connection 
+// type Orm = sqlite.DB | mysql.Connection
 
 struct GroupRouter {
 mut:
@@ -28,7 +29,7 @@ pub mut:
 	logger 				log.Log
 	recover_handler 	Handler
 	not_found_handler 	Handler
-	// db     				Orm		
+	db     				orm.Connection
 	di					di.Builder
 }
 
@@ -53,15 +54,17 @@ pub fn new(cfg Configuration) Application {
 	return app
 }
 
-// pub fn (mut app Application) use_db(mut db Orm) {
-// 	app.db = db
-// } 
+// 注册数据库连接对象
+pub fn (mut app Application) use_db(mut db orm.Connection) {
+	app.db = db
+}
 
 // 注册中间件
 pub fn (mut app GroupRouter) use(mw Handler) {
 	app.mws << mw
 }
 
+// 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler)  {
 	fk := "GET;" + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
@@ -156,15 +159,15 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 	}
 
 	files := os.ls(dir) or {
-		panic(err)
+		return
 	}
-	// 注册处理方法
+	// 注册处理方法 TODO 需要注册全部文件?
 	app.all("${prefix}/*filepath", cfn(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
 			app.deep_register(f_dir, '${prefix}/${file}', index_file)
-			
+
 			// 注册本级目录处理方法
 			app.all("${prefix}/${file}/*filepath", cfn(f_dir, index_file))
 		}
@@ -174,8 +177,8 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 // statics 静态文件处理
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
 	app.deep_register(
-		dir, 
-		if prefix == '/' { '' } else {  prefix }, 
+		dir,
+		if prefix == '/' { '' } else {  prefix },
 		if index_file.len > 0 { index_file[0] } else { '' }
 	)
 }
@@ -197,8 +200,8 @@ pub fn (mut app GroupRouter) controller<T>(mut instance T) {
 				if method.name == name {
 					// FIXME error: invalid string method call: expected `string`, not `FunctionData`
 					ctrl.$method() // 调用名称必须为 `method`
-					return 
-				} 
+					return
+				}
 			}
 		})
 	}
@@ -210,7 +213,7 @@ fn (mut app Application) handle(req Request) Response {
 		return Response{ body: '${err}' }
 	}
 	url.host = req.header.get(.host) or { '' }
-	key := req.method.str() + ";" + url.path 
+	key := req.method.str() + ";" + url.path
 	mut req_ctx := Context {
 		req: req
 		url: url
@@ -238,5 +241,5 @@ fn (mut app Application) handle(req Request) Response {
 pub fn (mut app Application) run() {
 	app.Server.handler = app
 	print('[Pine for V] ')
-	app.Server.listen_and_serve() 
+	app.Server.listen_and_serve()
 }

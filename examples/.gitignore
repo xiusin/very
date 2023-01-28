@@ -11,3 +11,4 @@ vls.log
 *.dSYM
 test.v
 statics
+.idea

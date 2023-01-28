@@ -3,5 +3,7 @@ Module {
 	description: ''
 	version: ''
 	license: ''
-	dependencies: []
+	dependencies: [
+	    'xiusin.very'
+	]
 }
