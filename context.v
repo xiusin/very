@@ -151,8 +151,8 @@ pub fn (mut ctx Context) set(key string, value Val) {
 	ctx.values[key] = value
 }
 
-pub fn (mut ctx Context) value(key string) Val {
-	return ctx.values[key] or { unsafe { nil } }
+pub fn (mut ctx Context) value(key string) !Val {
+	return ctx.values[key] or { none }
 }
 
 pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
