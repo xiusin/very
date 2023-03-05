@@ -7,26 +7,25 @@ import db.sqlite
 // 必须得定义在这?
 [table: 'users']
 pub struct User {
-	pub mut:
+pub mut:
 	id         int    [primary; sql: serial]
 	username   string [required; sql_type: 'TEXT']
 	password   string [required; sql_type: 'TEXT']
 	created_at string [default: 'CURRENT_TIMESTAMP']
 	updated_at string [default: 'CURRENT_TIMESTAMP']
-	active     	bool
+	active     bool
 }
 
 [table: 'articles']
 pub struct Article {
-	pub mut:
-	id         	int    [primary; sql: serial]
-	title 		string
-	content 	string
-	time 		string
-	tags 		string
-	star     	bool
+pub mut:
+	id      int    [primary; sql: serial]
+	title   string
+	content string
+	time    string
+	tags    string
+	star    bool
 }
-
 
 pub struct ApiResponse[T] {
 	code int
@@ -40,8 +39,8 @@ fn main() {
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
-	app.di.set(di.Service {
-		name: "db"
+	app.di.set(di.Service{
+		name: 'db'
 		instance: &db
 	})
 
@@ -49,25 +48,25 @@ fn main() {
 		create table Article
 	}
 
-	mut api := app.group("/api")
-	api.get("/article/list", fn (mut ctx very.Context) ? {
-		// mut db := ctx.di.get[sqlite.DB]("db")?
+	mut api := app.group('/api')
+	api.get('/article/list', fn (mut ctx very.Context) ! {
+		mut db := ctx.di.get[sqlite.DB]('db')!
+		dump(db)
 		// result := sql db {
 		// 	select from Article
 		// } or { []Article{} }
 
-		ctx.json( ApiResponse[[]Article]{
+		ctx.json(ApiResponse[[]Article]{
 			code: 0
 			data: []Article{}
 		})
 	})
 
-	api.post("/article/save", fn(mut ctx very.Context) ? {
+	api.post('/article/save', fn (mut ctx very.Context) ! {
 		ctx.text(ctx.host())
 	})
 
-	app.statics("/", "statics", "index.html")
+	app.statics('/', 'statics', 'index.html')
 
 	app.run()
 }
-

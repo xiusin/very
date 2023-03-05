@@ -13,14 +13,14 @@ pub fn (mut b Builder) set(service Service) {
 	}
 }
 
-pub fn (mut b Builder) get<T>(name string) ?&T {
+pub fn (mut b Builder) get[T](name string) !&T {
 	lock b.services {
 		val := b.services[name].instance
 		match val {
-			T { return val } 
+			T { return val }
 			else {}
 		}
 	}
-	
-	return error("未找到服务${name}")
+
+	return error('未找到服务${name}')
 }
