@@ -7,8 +7,15 @@ import os
 import vweb
 import very.di
 import orm
+import xiusin.vcolor
 
 type Handler = fn (mut ctx Context) !
+
+const check_implement_err = error('Must pass in a structure that implements `IController`')
+
+pub interface IController {
+	ctx &Context
+}
 
 struct GroupRouter {
 mut:
@@ -157,20 +164,18 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 	}
 
 	files := os.ls(dir) or { return }
-	// 注册处理方法 TODO 需要注册全部文件?
+	// TODO need register all files?
 	app.all('${prefix}/*filepath', cfn(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
 			app.deep_register(f_dir, '${prefix}/${file}', index_file)
 
-			// 注册本级目录处理方法
 			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
 		}
 	}
 }
 
-// statics 静态文件处理
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
 	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, if index_file.len > 0 {
 		index_file[0]
@@ -179,23 +184,29 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	})
 }
 
-pub fn (mut app GroupRouter) controller[T](mut instance T) {
-	// TODO 判断T是否包含有ctx属性
-	$for method in T.methods {
-		http_methods, route_path := parse_attrs(method.name, method.attrs) or {
-			panic('解析方法`${method.name}`属性错误: ${err}')
-			return
-		}
-		name := method.name
-		app.add(http_methods[0], route_path, fn [mut instance, name] [T](mut ctx Context) {
-			mut ctrl := instance // replace with .clone()
-			ctrl.ctx = unsafe { ctx }
+pub fn (mut app GroupRouter) mount[T](mut instance T) {
+	$if instance !is IController {
+		panic(very.check_implement_err)
+	}
 
-			// TODO 注入其他属性
+	mut valid_ctx := false
+	$for field in T.fields {
+		$if field.name == 'ctx' && field.is_mut && field.is_pub {
+			valid_ctx = true
+		}
+	}
+	if !valid_ctx {
+		panic(error('Please set the `pub mut: ctx &very.Context = unsafe { nil }` attribute in struct `${T.name}`'))
+	}
+	$for method in T.methods {
+		http_methods, route_path := parse_attrs(method.name, method.attrs) or { panic(err) }
+		name := method.name
+		app.add(http_methods[0], route_path, fn [instance, name] [T](mut ctx Context) ! {
+			mut ctrl := instance
+			ctrl.ctx = unsafe { ctx }
 			$for method in T.methods {
 				if method.name == name {
-					// FIXME error: invalid string method call: expected `string`, not `FunctionData`
-					ctrl.$method() // 调用名称必须为 `method`
+					ctrl.$method()
 					return
 				}
 			}
@@ -240,6 +251,10 @@ fn (mut app Application) handle(req Request) Response {
 // run 启动Application服务
 pub fn (mut app Application) run() {
 	app.Server.handler = app
-	print('[Pine for V] ')
+
+	mut color := vcolor.new(.bg_yellow, vcolor.Attribute.bold, vcolor.Attribute.underline,
+		vcolor.Attribute.bg_hi_red)
+
+	print(color.sprint('[Very]'))
 	app.Server.listen_and_serve()
 }

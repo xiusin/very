@@ -11,85 +11,102 @@ Express inspired web framework written in V with `net.http.server` module.
 module main
 
 import xiusin.very
-import sqlite
-import entities
+import xiusin.very.di
+import db.sqlite
 
-struct Contrller {
-mut:
-	userid int
-	ctx &very.Context
+[table: 'users']
+pub struct User {
+pub mut:
+	id         int    [primary; sql: serial]
+	username   string [required; sql_type: 'TEXT']
+	password   string [required; sql_type: 'TEXT']
+	created_at string [default: 'CURRENT_TIMESTAMP']
+	updated_at string [default: 'CURRENT_TIMESTAMP']
+	active     bool
 }
 
-pub fn (mut c Contrller) success() {
+[table: 'articles']
+pub struct Article {
+pub mut:
+	id      int    [primary; sql: serial]
+	title   string
+	content string
+	time    string
+	tags    string
+	star    bool
+}
+
+pub struct ApiResponse[T] {
+	code int
+	msg  string
+	data T
+}
+
+struct DemoContrller {
+pub mut:
+	userid int
+	ctx    &very.Context
+}
+
+['/demo/success'; get]
+pub fn (mut c DemoContrller) success() {
 	if c.userid > 0 {
-		c.ctx.text("success: exists")
+		c.ctx.text('success: exists')
 	} else {
 		c.userid = 1
-		c.ctx.text("success set user_id = ${c.userid}")
+		c.ctx.text('success set user_id = ${c.userid}')
 	}
 }
-pub fn (mut c Contrller) success1() {
+
+['/demo/success1'; get]
+pub fn (mut c DemoContrller) success1() {
 	if c.userid > 0 {
-		c.ctx.text("success1: exists")
+		c.ctx.text('success1: exists')
 	} else {
 		c.userid = 2
-		c.ctx.text("success1 set user_id = ${c.userid}")
+		c.ctx.text('success1 set user_id = ${c.userid}')
 	}
 }
-fn main() {
-	mut app := very.new_app(very.default_configuration())
 
+fn main() {
+	mut app := very.new(very.default_configuration())
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
+	app.di.set(di.Service{
+		name: 'db'
+		instance: &db
+	})
 
 	sql db {
-		create table entities.User
+		create table Article
 	}
 
-	app.use_db(mut db)
-	// app.use_inner_db(mut db)
-	app.use(fn(mut ctx very.Context) {
-		ctx.next()
+	mut api := app.group('/api')
+
+	mut counter := 0
+
+	api.get('/hello', fn [mut counter] (mut ctx very.Context) ! {
+		ctx.text('hello world: ${counter}')
 	})
 
-	app.use(fn (mut ctx very.Context) {
-		mut token := ctx.header(.authorization)
-		token = token.after('Bearer ')
-		ctx.next()
-	})
-
-	app.use(fn (mut ctx very.Context) {
-		ctx.set("user_id", 1)
-		ctx.next()
-	})
-
-	app.get("/hello/:name", fn(mut ctx very.Context) {
-		user := entities.User{
-			username: "xiusin"
-			password: "123456"
-			active: true
+	api.get('/article/list', fn (mut ctx very.Context) ! {
+		mut db := ctx.di.get[sqlite.DB]('db')!
+		result := sql db {
+			select from Article
 		}
-
-		mut db := ctx.db as sqlite.DB
-		sql db {
-			insert user into entities.User
-		}
-
-		user_id := ctx.value("user_id") as int
-		ctx.json("hello ${ctx.param('name')} ${user_id} ip ${ctx.client_ip()}")
+		ctx.json(ApiResponse[[]Article]{
+			code: 0
+			data: []Article{}
+		})
 	})
 
-	mut router := app.group("/:version")
-
-	router.get("/user", fn(mut ctx very.Context) {
-		ctx.text("${ctx.path()} -- ${ctx.param('version')}")
+	api.post('/article/save', fn (mut ctx very.Context) ! {
+		ctx.text(ctx.host())
 	})
 
-	app.statics("/statics", ".")
-
-	app.controller(mut Controller{})
-
+	app.mount(mut Contrller{})
+	app.statics('/', 'statics', 'index.html')
 	app.run()
 }
 ```

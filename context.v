@@ -5,7 +5,7 @@ import net.urllib
 import very.session
 import json
 import log
-import di
+import very.di
 
 pub type Val = []byte
 	| []f64
@@ -152,7 +152,7 @@ pub fn (mut ctx Context) set(key string, value Val) {
 }
 
 pub fn (mut ctx Context) value(key string) !Val {
-	return ctx.values[key] or { none }
+	return ctx.values[key]!
 }
 
 pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
