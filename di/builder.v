@@ -6,7 +6,7 @@ mut:
 	services shared map[string]Service
 }
 
-// 必须设置引用类型
+// set The reference type must be set
 pub fn (mut b Builder) set(service Service) {
 	lock b.services {
 		b.services[service.name] = service
