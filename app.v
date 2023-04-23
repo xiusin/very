@@ -17,11 +17,26 @@ pub interface IController {
 	ctx &Context
 }
 
+pub interface Injectable {
+	get_di() &di.Builder
+	set_di(mut builder di.Builder)
+}
+
 struct GroupRouter {
 mut:
 	trier  &Trier
 	mws    []Handler
 	prefix string
+pub mut:
+	di &di.Builder = unsafe { &di.Builder{} }
+}
+
+fn (mut app GroupRouter) get_di() &di.Builder {
+	return app.di
+}
+
+fn (mut app GroupRouter) set_di(mut builder di.Builder) {
+	app.di = unsafe { builder }
 }
 
 [heap]
@@ -29,13 +44,13 @@ pub struct Application {
 	Server
 	GroupRouter
 mut:
-	cfg Configuration
+	cfg     Configuration
+	quit_ch chan os.Signal
 pub mut:
 	logger            log.Log
 	recover_handler   Handler
 	not_found_handler Handler
 	db                orm.Connection
-	di                di.Builder
 }
 
 // 获取一个Application实例
@@ -44,6 +59,7 @@ pub fn new(cfg Configuration) Application {
 		Server: Server{}
 		cfg: cfg
 		db: unsafe { nil }
+		di: &di.Builder{}
 		trier: new_trie()
 		logger: log.Log{
 			level: .debug
@@ -61,31 +77,30 @@ pub fn new(cfg Configuration) Application {
 }
 
 // 注册数据库连接对象
+[inline]
 pub fn (mut app Application) use_db(mut db orm.Connection) {
 	app.db = db
 }
 
 // 注册中间件
+[inline]
 pub fn (mut app GroupRouter) use(mw Handler) {
 	app.mws << mw
 }
 
 // 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
-	fk := 'GET;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
 	app.head(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
-	fk := 'POST;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add('POST;' + app.get_with_prefix(path), handle, mws)
 	app.head(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler) {
-	fk := 'OPTIONS;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add('OPTIONS;' + app.get_with_prefix(path), handle, mws)
 	app.head(path, handle, ...mws)
 }
 
@@ -95,21 +110,21 @@ pub fn (mut app GroupRouter) put(path string, handle Handler, mws ...Handler) {
 	app.head(path, handle, ...mws)
 }
 
+[inline]
 pub fn (mut app GroupRouter) delete(path string, handle Handler, mws ...Handler) {
-	fk := 'DELETE;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add('DELETE;' + app.get_with_prefix(path), handle, mws)
 	app.head(path, handle, ...mws)
 }
 
+[inline]
 pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
-	fk := 'HEAD;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add('HEAD;' + app.get_with_prefix(path), handle, mws)
 }
 
 // add 添加一个路由
+[inline]
 pub fn (mut app GroupRouter) add(method http.Method, path string, handle Handler, mws ...Handler) {
-	fk := method.str() + ';' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
+	app.trier.add(method.str() + ';' + app.get_with_prefix(path), handle, mws)
 }
 
 // all 注册所有请求方法
@@ -135,11 +150,13 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 
 // group 获取一个路由分组
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
-	return &GroupRouter{
+	mut group := &GroupRouter{
 		trier: app.trier
 		mws: mws
+		di: app.di
 		prefix: app.get_with_prefix(prefix)
 	}
+	return group
 }
 
 fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file string) {
@@ -152,7 +169,7 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 			file := dir.trim('/') + '/' + filepath
 			data := os.read_file(file) or {
 				eprintln('read file ${file} ${err}')
-				ctx.abort(500, '${err}')
+				ctx.abort(Status.internal_server_error, '${err}')
 				return
 			}
 			ext := os.file_ext(file)
@@ -170,47 +187,58 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
 			app.deep_register(f_dir, '${prefix}/${file}', index_file)
-
 			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
 		}
 	}
 }
 
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
-	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, if index_file.len > 0 {
+	default_index_file := if index_file.len > 0 {
 		index_file[0]
 	} else {
 		''
-	})
+	}
+	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
 pub fn (mut app GroupRouter) mount[T](mut instance T) {
+	// mut inject_flag := 'inject: '
 	$if instance !is IController {
 		panic(very.check_implement_err)
 	}
-
 	mut valid_ctx := false
 	$for field in T.fields {
 		$if field.name == 'ctx' && field.is_mut && field.is_pub {
 			valid_ctx = true
 		}
+		// FIXME wait any type
+		// services := field.attrs.filter(it.contains(inject_flag)).map(it.replace(inject_flag,
+		// 	''))
+		// if services.len == 1 {
+		// 	println('${services[0]} = ${app.di.get(services[0]) or { panic(err) }}')
+		// 	println('field.field = ${services}')
+		// }
 	}
 	if !valid_ctx {
 		panic(error('Please set the `pub mut: ctx &very.Context = unsafe { nil }` attribute in struct `${T.name}`'))
 	}
 	$for method in T.methods {
 		http_methods, route_path := parse_attrs(method.name, method.attrs) or { panic(err) }
-		name := method.name
-		app.add(http_methods[0], route_path, fn [instance, name] [T](mut ctx Context) ! {
-			mut ctrl := instance
-			ctrl.ctx = unsafe { ctx }
-			$for method in T.methods {
-				if method.name == name {
-					ctrl.$method()
-					return
-				}
-			}
-		})
+		// name := method.name
+		for _, ano_method in http_methods {
+			app.add(ano_method, route_path, fn [T](mut ctx Context) ! {
+				mut ctrl := T{}
+				ctrl.ctx = unsafe { ctx }
+				ctx.abort(Status.internal_server_error, 'Wait fix https://github.com/vlang/v/issues/17789')
+				// ctrl.$name()
+				// // $for method in T.methods {
+				// 	if method.name == name {
+				// 		ctrl.$method()
+				// 		return
+				// 	}
+				// }
+			})
+		}
 	}
 }
 
@@ -225,7 +253,7 @@ fn (mut app Application) handle(req Request) Response {
 		req: req
 		url: url
 		resp: Response{}
-		di: &app.di
+		di: app.di
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}
@@ -248,13 +276,38 @@ fn (mut app Application) handle(req Request) Response {
 	return req_ctx.resp
 }
 
-// run 启动Application服务
+pub fn (mut app Application) graceful_shutdown(quit chan os.Signal) {
+	_ := <-quit
+	println(vcolor.red_string('server exit'))
+	app.close()
+}
+
+fn (mut app Application) register_signal() {
+	os.signal_opt(.int, fn [mut app] (it os.Signal) {
+		app.quit_ch <- it
+	}) or {}
+
+	os.signal_opt(.kill, fn [mut app] (it os.Signal) {
+		app.quit_ch <- it
+	}) or {}
+
+	os.signal_opt(.term, fn [mut app] (it os.Signal) {
+		app.quit_ch <- it
+	}) or {}
+}
+
+// run Start web service
 pub fn (mut app Application) run() {
 	app.Server.handler = app
 
-	mut color := vcolor.new(.bg_yellow, vcolor.Attribute.bold, vcolor.Attribute.underline,
-		vcolor.Attribute.bg_hi_red)
+	mut quit_ch := chan os.Signal{}
 
-	print(color.sprint('[Very]'))
+	attrs := [vcolor.Attribute.bg_yellow, vcolor.Attribute.bold, vcolor.Attribute.underline,
+		vcolor.Attribute.bg_hi_red]
+
+	mut color := vcolor.new(...attrs)
+	print(color.sprint('[Very] [Experimental] '))
+
+	spawn app.graceful_shutdown(quit_ch)
 	app.Server.listen_and_serve()
 }

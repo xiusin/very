@@ -74,11 +74,11 @@ pub fn (mut ctx Context) handle() ! {
 	ctx.handler(mut ctx)!
 }
 
-pub fn (mut ctx Context) set_status(status_code int) {
-	ctx.resp.status_code = status_code
+pub fn (mut ctx Context) set_status(status_code http.Status) {
+	ctx.resp.status_code = status_code.int()
 }
 
-pub fn (mut ctx Context) abort(status_code int, msg ...string) {
+pub fn (mut ctx Context) abort(status_code http.Status, msg ...string) {
 	ctx.set_status(status_code)
 	ctx.stop()
 	if msg.len > 0 {
@@ -99,9 +99,9 @@ pub fn (mut ctx Context) text(result string) {
 	ctx.resp.body = result
 }
 
-// pub fn (mut ctx Context) bytes(result []byte) {
-// 	ctx.resp.body = result.str()
-// }
+pub fn (mut ctx Context) bytes(result []byte) {
+ 	ctx.resp.body = result.str()
+}
 
 pub fn (mut ctx Context) html(result string) {
 	ctx.resp.header.add(.content_type, 'text/html')

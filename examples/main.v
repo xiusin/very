@@ -32,14 +32,15 @@ pub struct ApiResponse[T] {
 	data T
 }
 
-struct DemoContrller {
+struct DemoController {
 pub mut:
-	userid int
-	ctx    &very.Context
+	userid  int
+	ctx     &very.Context = unsafe { nil }
+	counter &int          [inject: 'counter'] = unsafe { 0 }
 }
 
 ['/demo/success'; get]
-pub fn (mut c DemoContrller) success() {
+pub fn (mut c DemoController) success() {
 	if c.userid > 0 {
 		c.ctx.text('success: exists')
 	} else {
@@ -49,7 +50,7 @@ pub fn (mut c DemoContrller) success() {
 }
 
 ['/demo/success1'; get]
-pub fn (mut c DemoContrller) success1() {
+pub fn (mut c DemoController) success1() {
 	if c.userid > 0 {
 		c.ctx.text('success1: exists')
 	} else {
@@ -61,8 +62,13 @@ pub fn (mut c DemoContrller) success1() {
 fn main() {
 	mut app := very.new(very.default_configuration())
 	mut db := sqlite.connect('database.db') or { panic(err) }
+	mut counter := 0
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
+	app.di.set(di.Service{
+		name: 'counter'
+		instance: &counter
+	})
 	app.di.set(di.Service{
 		name: 'db'
 		instance: &db
@@ -70,24 +76,26 @@ fn main() {
 
 	sql db {
 		create table Article
-	}
+	}!
 
 	mut api := app.group('/api')
 
-	mut counter := 0
+	api.get('/hello', fn (mut ctx very.Context) ! {
+		// mut counter := int()
+		// println(unsafe { &int(app.di.get('counter')!) })
 
-	api.get('/hello', fn [mut counter] (mut ctx very.Context) ! {
-		ctx.text('hello world: ${counter}')
+		// counter = counter + 1
+		ctx.text('hello world')
 	})
 
 	api.get('/article/list', fn (mut ctx very.Context) ! {
 		mut db := ctx.di.get[sqlite.DB]('db')!
 		result := sql db {
 			select from Article
-		}
+		}!
 		ctx.json(ApiResponse[[]Article]{
 			code: 0
-			data: []Article{}
+			data: result
 		})
 	})
 
@@ -95,7 +103,7 @@ fn main() {
 		ctx.text(ctx.host())
 	})
 
-	app.mount(mut Contrller{})
+	app.mount(mut DemoController{})
 	app.statics('/', 'statics', 'index.html')
 	app.run()
 }
