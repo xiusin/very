@@ -91,34 +91,34 @@ pub fn (mut app GroupRouter) use(mw Handler) {
 // 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
 	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
-	app.head(path, handle, ...mws)
+	app.options(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
 	app.trier.add('POST;' + app.get_with_prefix(path), handle, mws)
-	app.head(path, handle, ...mws)
+	app.options(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler) {
 	app.trier.add('OPTIONS;' + app.get_with_prefix(path), handle, mws)
-	app.head(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) put(path string, handle Handler, mws ...Handler) {
 	fk := 'PUT;' + app.get_with_prefix(path)
 	app.trier.add(fk, handle, mws)
-	app.head(path, handle, ...mws)
+	app.options(path, handle, ...mws)
 }
 
 [inline]
 pub fn (mut app GroupRouter) delete(path string, handle Handler, mws ...Handler) {
 	app.trier.add('DELETE;' + app.get_with_prefix(path), handle, mws)
-	app.head(path, handle, ...mws)
+	app.options(path, handle, ...mws)
 }
 
 [inline]
 pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
 	app.trier.add('HEAD;' + app.get_with_prefix(path), handle, mws)
+	app.options(path, handle, ...mws)
 }
 
 // add 添加一个路由
@@ -133,6 +133,7 @@ pub fn (mut app GroupRouter) all(path string, handle Handler, mws ...Handler) {
 	app.add(.post, path, handle, ...mws)
 	app.add(.delete, path, handle, ...mws)
 	app.add(.put, path, handle, ...mws)
+	app.add(.options, path, handle, ...mws)
 }
 
 // get_with_prefix 获取带前缀的路由path
@@ -257,6 +258,7 @@ fn (mut app Application) handle(req Request) Response {
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}
+
 
 	node, params, ok := app.trier.find(key)
 	req_ctx.params = params.clone()
