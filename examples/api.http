@@ -1,5 +1,0 @@
-@domain=http://localhost:8080
-
-###
-# 获取列表
-GET {{domain}}/api/article/list

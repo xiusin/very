@@ -6,6 +6,7 @@ import very.session
 import json
 import log
 import very.di
+import orm
 
 pub type Val = []byte
 	| []f64
@@ -36,7 +37,8 @@ mut:
 	form       map[string]string
 	files      map[string][]http.FileData
 	params     map[string]string
-	values     map[string]Val
+	err        IError = none
+	values     map[string]Val = map[string]Val{}
 pub mut:
 	mws     []Handler
 	handler Handler
@@ -44,6 +46,7 @@ pub mut:
 	sess    session.Session
 	logger  log.Log
 	di      &di.Builder = unsafe { nil }
+	db  	orm.Connection
 }
 
 pub fn (mut ctx Context) next() ! {
@@ -74,6 +77,14 @@ pub fn (mut ctx Context) handle() ! {
 	ctx.handler(mut ctx)!
 }
 
+pub fn (mut ctx Context) err() IError {
+	return ctx.err
+}
+
+// pub fn (mut ctx Context) header() &http.Header {
+// 	return ctx.writer().header
+// }
+
 pub fn (mut ctx Context) set_status(status_code http.Status) {
 	ctx.resp.status_code = status_code.int()
 }
@@ -100,7 +111,7 @@ pub fn (mut ctx Context) text(result string) {
 }
 
 pub fn (mut ctx Context) bytes(result []byte) {
- 	ctx.resp.body = result.str()
+	ctx.resp.body = result.str()
 }
 
 pub fn (mut ctx Context) html(result string) {

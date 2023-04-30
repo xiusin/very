@@ -1,6 +1,6 @@
 module very
 
-import net.http { Request, Response, Server, Status }
+import net.http { Request, Response, ResponseConfig, Server, Status, new_response }
 import net.urllib
 import log
 import os
@@ -64,11 +64,15 @@ pub fn new(cfg Configuration) Application {
 		logger: log.Log{
 			level: .debug
 		}
+		recover_handler: fn (mut ctx Context) ! {
+			ctx.set_status(.internal_server_error)
+			ctx.text('has err: ${ctx.err}')
+		}
 		not_found_handler: fn (mut ctx Context) ! {
 			ctx.resp = Response{
 				body: 'the router ${ctx.req.url} not found'
-				status_code: Status.not_found.int()
 			}
+			ctx.resp.set_status(.not_found)
 		}
 	}
 
@@ -84,7 +88,7 @@ pub fn (mut app Application) use_db(mut db orm.Connection) {
 
 // 注册中间件
 [inline]
-pub fn (mut app GroupRouter) use(mw Handler) {
+pub fn (mut app GroupRouter) use(mw ...Handler) {
 	app.mws << mw
 }
 
@@ -154,7 +158,7 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	mut group := &GroupRouter{
 		trier: app.trier
 		mws: mws
-		di: app.di
+		di: app.get_di()
 		prefix: app.get_with_prefix(prefix)
 	}
 	return group
@@ -253,28 +257,31 @@ fn (mut app Application) handle(req Request) Response {
 	mut req_ctx := Context{
 		req: req
 		url: url
-		resp: Response{}
-		di: app.di
+		resp: new_response(ResponseConfig{})
+		di: app.get_di()
+		db: app.db
 		query: http.parse_form(url.raw_query)
 		params: map[string]string{}
 	}
 
-
+	req_ctx.resp.header.set(.server, 'vlang/very')
 	node, params, ok := app.trier.find(key)
 	req_ctx.params = params.clone()
 	if !ok {
-		app.not_found_handler(mut req_ctx) or { return Response{
-			body: '${err}'
-		} }
+		app.not_found_handler(mut req_ctx) or {
+			req_ctx.err = err
+			app.recover_handler(mut req_ctx) or {}
+		}
 	} else {
 		req_ctx.handler = node.handler_fn()
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or { return Response{
-			body: '${err}'
-		} }
+		req_ctx.next() or {
+			req_ctx.err = err
+			app.recover_handler(mut req_ctx) or {}
+		}
 	}
-
+	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return req_ctx.resp
 }
 
@@ -305,10 +312,19 @@ pub fn (mut app Application) run() {
 	mut quit_ch := chan os.Signal{}
 
 	attrs := [vcolor.Attribute.bg_yellow, vcolor.Attribute.bold, vcolor.Attribute.underline,
-		vcolor.Attribute.bg_hi_red]
+		vcolor.Attribute.bg_green]
 
 	mut color := vcolor.new(...attrs)
-	print(color.sprint('[Very] [Experimental] '))
+	println(r"__      __                
+\ \    / /                
+ \ \  / /___  _ __  _   _ 
+  \ \/ // _ \| '__|| | | |
+   \  /|  __/| |   | |_| |
+    \/  \___||_|    \__, |
+                     __/ |
+                    |___/ 
+")
+	print(color.sprint('[Very] '))
 
 	spawn app.graceful_shutdown(quit_ch)
 	app.Server.listen_and_serve()
