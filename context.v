@@ -28,7 +28,6 @@ pub type Val = []byte
 pub struct Context {
 pub:
 	req http.Request
-	// ctx context.Context
 mut:
 	mw_index   int = -1
 	is_stopped bool
@@ -46,7 +45,7 @@ pub mut:
 	sess    session.Session
 	logger  log.Log
 	di      &di.Builder = unsafe { nil }
-	db  	orm.Connection
+	db      orm.Connection
 }
 
 pub fn (mut ctx Context) next() ! {
@@ -81,9 +80,13 @@ pub fn (mut ctx Context) err() IError {
 	return ctx.err
 }
 
-// pub fn (mut ctx Context) header() &http.Header {
-// 	return ctx.writer().header
-// }
+pub fn (mut ctx Context) get_custom_header(key string) !string {
+	return ctx.writer().header.get_custom(key)!
+}
+
+pub fn (mut ctx Context) get_header(key http.CommonHeader) !string {
+	return ctx.writer().header.get(key)!
+}
 
 pub fn (mut ctx Context) set_status(status_code http.Status) {
 	ctx.resp.status_code = status_code.int()
@@ -115,12 +118,16 @@ pub fn (mut ctx Context) bytes(result []byte) {
 }
 
 pub fn (mut ctx Context) html(result string) {
-	ctx.resp.header.add(.content_type, 'text/html')
+	ctx.resp.header.set(.content_type, 'text/html')
 	ctx.resp.body = result
 }
 
 pub fn (mut ctx Context) query(key string) string {
 	return ctx.query[key] or { '' }
+}
+
+pub fn (mut ctx Context) add_query(key string, value string) {
+	ctx.query[key] = value
 }
 
 pub fn (mut ctx Context) file(name string) ![]http.FileData {
@@ -144,6 +151,10 @@ pub fn (mut ctx Context) redirect(url string) {
 
 pub fn (mut ctx Context) param(key string) string {
 	return ctx.params[key] or { '' }
+}
+
+pub fn (mut ctx Context) referer() string {
+	return ctx.req.header.get(.referer) or { '' }
 }
 
 pub fn (mut ctx Context) host() string {

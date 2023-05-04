@@ -13,6 +13,8 @@ type Handler = fn (mut ctx Context) !
 
 const check_implement_err = error('Must pass in a structure that implements `IController`')
 
+const version = 'v0.0.0 dev'
+
 pub interface IController {
 	ctx &Context
 }
@@ -44,9 +46,11 @@ pub struct Application {
 	Server
 	GroupRouter
 mut:
-	cfg     Configuration
-	quit_ch chan os.Signal
+	cfg        Configuration
+	quit_ch    chan os.Signal
+	interrupts []fn ()
 pub mut:
+	global_mws        []Handler
 	logger            log.Log
 	recover_handler   Handler
 	not_found_handler Handler
@@ -86,10 +90,16 @@ pub fn (mut app Application) use_db(mut db orm.Connection) {
 	app.db = db
 }
 
-// 注册中间件
+// 注册全局中间件: 在每个请求都会触发
 [inline]
-pub fn (mut app GroupRouter) use(mw ...Handler) {
-	app.mws << mw
+pub fn (mut app Application) global_use(mws ...Handler) {
+	app.global_mws << mws
+}
+
+// 注册中间件: 匹配到路由时才会执行
+[inline]
+pub fn (mut app GroupRouter) use(mws ...Handler) {
+	app.mws << mws
 }
 
 // 注册get路由
@@ -264,7 +274,9 @@ fn (mut app Application) handle(req Request) Response {
 		params: map[string]string{}
 	}
 
-	req_ctx.resp.header.set(.server, 'vlang/very')
+	req_ctx.resp.header.set(.server, 'vlang/xiusin-very')
+	req_ctx.resp.header.set(.connection, 'close')
+
 	node, params, ok := app.trier.find(key)
 	req_ctx.params = params.clone()
 	if !ok {
@@ -285,10 +297,17 @@ fn (mut app Application) handle(req Request) Response {
 	return req_ctx.resp
 }
 
-pub fn (mut app Application) graceful_shutdown(quit chan os.Signal) {
-	_ := <-quit
-	println(vcolor.red_string('server exit'))
+pub fn (mut app Application) graceful_shutdown() {
+	_ := <-app.quit_ch
+	for interrupt_fn in app.interrupts {
+		interrupt_fn()
+	}
 	app.close()
+}
+
+[inline]
+pub fn (mut app Application) register_on_interrupt(cbs ...fn ()) {
+	app.interrupts << cbs
 }
 
 fn (mut app Application) register_signal() {
@@ -308,24 +327,20 @@ fn (mut app Application) register_signal() {
 // run Start web service
 pub fn (mut app Application) run() {
 	app.Server.handler = app
-
-	mut quit_ch := chan os.Signal{}
-
-	attrs := [vcolor.Attribute.bg_yellow, vcolor.Attribute.bold, vcolor.Attribute.underline,
-		vcolor.Attribute.bg_green]
+	app.quit_ch = chan os.Signal{}
+	app.register_signal()
+	attrs := [vcolor.Attribute.bg_yellow, .bold, .underline, .bg_green]
 
 	mut color := vcolor.new(...attrs)
-	println(r"__      __                
-\ \    / /                
- \ \  / /___  _ __  _   _ 
-  \ \/ // _ \| '__|| | | |
-   \  /|  __/| |   | |_| |
-    \/  \___||_|    \__, |
-                     __/ |
-                    |___/ 
-")
+	println(
+		r'
+ _  _  ____  ____  _  _ 
+/ )( \(  __)(  _ \( \/ )
+\ \/ / ) _)  )   / )  / 
+ \__/ (____)(__\_)(__/  '.trim_left('\n') +
+		very.version + '\n')
 	print(color.sprint('[Very] '))
 
-	spawn app.graceful_shutdown(quit_ch)
+	spawn app.graceful_shutdown()
 	app.Server.listen_and_serve()
 }
