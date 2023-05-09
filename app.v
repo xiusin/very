@@ -237,21 +237,20 @@ pub fn (mut app GroupRouter) mount[T](mut instance T) {
 	if !valid_ctx {
 		panic(error('Please set the `pub mut: ctx &very.Context = unsafe { nil }` attribute in struct `${T.name}`'))
 	}
-	$for method in T.methods {
-		http_methods, route_path := parse_attrs(method.name, method.attrs) or { panic(err) }
-		// name := method.name
+	$for method_ in T.methods {
+		http_methods, route_path := parse_attrs(method_.name, method_.attrs) or { panic(err) }
+		method := method_
 		for _, ano_method in http_methods {
-			app.add(ano_method, route_path, fn [T](mut ctx Context) ! {
+			app.add(ano_method, route_path, fn [method] [T](mut ctx Context) ! {
 				mut ctrl := T{}
 				ctrl.ctx = unsafe { ctx }
 				ctx.abort(Status.internal_server_error, 'Wait fix https://github.com/vlang/v/issues/17789')
-				// ctrl.$name()
-				// // $for method in T.methods {
-				// 	if method.name == name {
-				// 		ctrl.$method()
-				// 		return
-				// 	}
-				// }
+				$for method__ in T.methods {
+					if method__.name == method.name {
+						ctrl.$method()
+						return
+					}
+				}
 			})
 		}
 	}
