@@ -217,7 +217,7 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 }
 
 pub fn (mut app GroupRouter) mount[T](mut instance T) {
-	// mut inject_flag := 'inject: '
+	mut inject_flag := 'inject: '
 	$if instance !is IController {
 		panic(very.check_implement_err)
 	}
@@ -227,12 +227,12 @@ pub fn (mut app GroupRouter) mount[T](mut instance T) {
 			valid_ctx = true
 		}
 		// FIXME wait any type
-		// services := field.attrs.filter(it.contains(inject_flag)).map(it.replace(inject_flag,
-		// 	''))
-		// if services.len == 1 {
-		// 	println('${services[0]} = ${app.di.get(services[0]) or { panic(err) }}')
-		// 	println('field.field = ${services}')
-		// }
+		services := field.attrs.filter(it.contains(inject_flag)).map(it.replace(inject_flag,
+			''))
+		if services.len == 1 {
+			println('${services[0]} = ${app.di.get(services[0]) or { panic(err) }}')
+			println('field.field = ${services}')
+		}
 	}
 	if !valid_ctx {
 		panic(error('Please set the `pub mut: ctx &very.Context = unsafe { nil }` attribute in struct `${T.name}`'))
@@ -244,7 +244,6 @@ pub fn (mut app GroupRouter) mount[T](mut instance T) {
 			app.add(ano_method, route_path, fn [method] [T](mut ctx Context) ! {
 				mut ctrl := T{}
 				ctrl.ctx = unsafe { ctx }
-				ctx.abort(Status.internal_server_error, 'Wait fix https://github.com/vlang/v/issues/17789')
 				$for method__ in T.methods {
 					if method__.name == method.name {
 						ctrl.$method()
