@@ -13,6 +13,13 @@ pub fn (mut b Builder) set(service Service) {
 	}
 }
 
+pub fn (mut b Builder) get_voidptr(name string) !voidptr {
+	lock b.services {
+		return b.services[name].instance
+	}
+	return error('未找到服务${name}')
+}
+
 pub fn (mut b Builder) get[T](name string) !&T {
 	lock b.services {
 		val := b.services[name].instance

@@ -196,7 +196,7 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 	}
 
 	files := os.ls(dir) or { return }
-	// TODO need register all files?
+	// FIXME need register all files?
 	app.all('${prefix}/*filepath', cfn(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
@@ -217,21 +217,19 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 }
 
 pub fn (mut app GroupRouter) mount[T](mut instance T) {
-	mut inject_flag := 'inject: '
+	mut di_flag := 'inject: '
 	$if instance !is IController {
 		panic(very.check_implement_err)
 	}
 	mut valid_ctx := false
+	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
 		$if field.name == 'ctx' && field.is_mut && field.is_pub {
 			valid_ctx = true
 		}
-		// FIXME wait any type
-		services := field.attrs.filter(it.contains(inject_flag)).map(it.replace(inject_flag,
-			''))
+		services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 		if services.len == 1 {
-			println('${services[0]} = ${app.di.get(services[0]) or { panic(err) }}')
-			println('field.field = ${services}')
+			injected_fields[field.name] = app.di.get_voidptr(services[0]) or { panic(err) }
 		}
 	}
 	if !valid_ctx {
@@ -241,9 +239,14 @@ pub fn (mut app GroupRouter) mount[T](mut instance T) {
 		http_methods, route_path := parse_attrs(method_.name, method_.attrs) or { panic(err) }
 		method := method_
 		for _, ano_method in http_methods {
-			app.add(ano_method, route_path, fn [method] [T](mut ctx Context) ! {
+			app.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 				mut ctrl := T{}
 				ctrl.ctx = unsafe { ctx }
+				$for field in T.fields {
+					if field.name in injected_fields {
+						ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+					}
+				}
 				$for method__ in T.methods {
 					if method__.name == method.name {
 						ctrl.$method()
