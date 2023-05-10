@@ -48,7 +48,7 @@ pub struct Application {
 mut:
 	cfg        Configuration
 	quit_ch    chan os.Signal
-	interrupts []fn ()
+	interrupts []fn () !
 pub mut:
 	global_mws        []Handler
 	logger            log.Log
@@ -298,16 +298,16 @@ fn (mut app Application) handle(req Request) Response {
 	return req_ctx.resp
 }
 
-pub fn (mut app Application) graceful_shutdown() {
+pub fn (mut app Application) graceful_shutdown() ! {
 	_ := <-app.quit_ch
 	for interrupt_fn in app.interrupts {
-		interrupt_fn()
+		interrupt_fn()!
 	}
 	app.close()
 }
 
 [inline]
-pub fn (mut app Application) register_on_interrupt(cbs ...fn ()) {
+pub fn (mut app Application) register_on_interrupt(cbs ...fn () !) {
 	app.interrupts << cbs
 }
 
