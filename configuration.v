@@ -3,7 +3,7 @@ module very
 import time
 
 [heap; noinit; params]
-struct Configuration {
+pub struct Configuration {
 mut:
 	port                       int           = 8080
 	app_name                   string        = 'very'
