@@ -310,12 +310,14 @@ fn (mut app Application) handle(req Request) Response {
 			}
 		}
 	}()
+
+	done := ctx.done()
 	select {
-		_ := <-ctx.done() {
+		_ := <-done {
 			req_ctx.resp.set_status(.gateway_timeout)
 			println('context canceled')
 		}
-		_ := <-req_ctx.done() {}
+		_ := <-req_ctx.finished {}
 	}
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return req_ctx.resp
