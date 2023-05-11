@@ -286,7 +286,7 @@ fn (mut app Application) handle(req Request) Response {
 	}
 
 	if app.cfg.server_name.len > 0 {
-		req_ctx.resp.header.set(.server, app.cfg.server_name.len)
+		req_ctx.resp.header.set(.server, app.cfg.server_name)
 	}
 	req_ctx.resp.header.set(.connection, 'close')
 
@@ -304,6 +304,11 @@ fn (mut app Application) handle(req Request) Response {
 			}
 		} else {
 			req_ctx.handler = node.handler_fn()
+
+			if app.cfg.pre_parse_multipart_form {
+				req_ctx.parse_form()!
+			}
+
 			req_ctx.mws = app.mws
 			req_ctx.mws << node.mws
 			req_ctx.next() or {
