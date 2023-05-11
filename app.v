@@ -8,6 +8,8 @@ import vweb
 import very.di
 import orm
 import xiusin.vcolor
+import time
+import context
 
 type Handler = fn (mut ctx Context) !
 
@@ -263,36 +265,57 @@ fn (mut app Application) handle(req Request) Response {
 	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
 	} }
+	mut background := context.background()
+	mut ctx, cancel := context.with_timeout(mut &background, time.second * 4)
+	defer {
+		cancel()
+	}
+
 	url.host = req.header.get(.host) or { '' }
 	key := req.method.str() + ';' + url.path
 	mut req_ctx := Context{
 		req: req
+		ctx: ctx
 		url: url
 		resp: new_response(ResponseConfig{})
 		di: app.get_di()
 		db: app.db
 		query: http.parse_form(url.raw_query)
+		finished: chan int{}
 		params: map[string]string{}
 	}
 
 	req_ctx.resp.header.set(.server, 'vlang/xiusin-very')
 	req_ctx.resp.header.set(.connection, 'close')
 
-	node, params, ok := app.trier.find(key)
-	req_ctx.params = params.clone()
-	if !ok {
-		app.not_found_handler(mut req_ctx) or {
-			req_ctx.err = err
-			app.recover_handler(mut req_ctx) or {}
+	spawn fn [mut app, mut req_ctx, key] () {
+		defer {
+			req_ctx.finished.close()
 		}
-	} else {
-		req_ctx.handler = node.handler_fn()
-		req_ctx.mws = app.mws
-		req_ctx.mws << node.mws
-		req_ctx.next() or {
-			req_ctx.err = err
-			app.recover_handler(mut req_ctx) or {}
+
+		node, params, ok := app.trier.find(key)
+		req_ctx.params = params.clone()
+		if !ok {
+			app.not_found_handler(mut req_ctx) or {
+				req_ctx.err = err
+				app.recover_handler(mut req_ctx) or {}
+			}
+		} else {
+			req_ctx.handler = node.handler_fn()
+			req_ctx.mws = app.mws
+			req_ctx.mws << node.mws
+			req_ctx.next() or {
+				req_ctx.err = err
+				app.recover_handler(mut req_ctx) or {}
+			}
 		}
+	}()
+	select {
+		_ := <-ctx.done() {
+			req_ctx.resp.set_status(.gateway_timeout)
+			println('context canceled')
+		}
+		_ := <-req_ctx.done() {}
 	}
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return req_ctx.resp

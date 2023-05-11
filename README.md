@@ -4,10 +4,9 @@ Express inspired web framework written in V with `net.http.server` module.
 
 >  [Experimental]
 
-
 ## example:
 
-``` v
+```vlang
 module main
 
 import xiusin.very
@@ -42,14 +41,16 @@ pub struct ApiResponse[T] {
 	data T
 }
 
-struct DemoContrller {
+[group: '/demo'] # To be implemented
+struct DemoController {
 pub mut:
 	userid int
-	ctx    &very.Context
+	ctx    &very.Context = unsafe { nil }
+	db     &sqlite.DB  [inject: 'db'] = unsafe { nil }
 }
 
 ['/demo/success'; get]
-pub fn (mut c DemoContrller) success() {
+pub fn (mut c DemoController) success() {
 	if c.userid > 0 {
 		c.ctx.text('success: exists')
 	} else {
@@ -59,7 +60,7 @@ pub fn (mut c DemoContrller) success() {
 }
 
 ['/demo/success1'; get]
-pub fn (mut c DemoContrller) success1() {
+pub fn (mut c DemoController) success1() {
 	if c.userid > 0 {
 		c.ctx.text('success1: exists')
 	} else {
@@ -94,7 +95,7 @@ fn main() {
 		mut db := ctx.di.get[sqlite.DB]('db')!
 		result := sql db {
 			select from Article
-		}
+		}!
 		ctx.json(ApiResponse[[]Article]{
 			code: 0
 			data: []Article{}

@@ -7,6 +7,8 @@ import json
 import log
 import very.di
 import orm
+import context
+import time
 
 pub type Val = []byte
 	| []f64
@@ -38,6 +40,8 @@ mut:
 	params     map[string]string
 	err        IError = none
 	values     map[string]Val = map[string]Val{}
+	ctx        context.Context
+	finished   chan int
 pub mut:
 	mws     []Handler
 	handler Handler
@@ -46,6 +50,22 @@ pub mut:
 	logger  log.Log
 	di      &di.Builder = unsafe { nil }
 	db      orm.Connection
+}
+
+fn (ctx &Context) deadline() ?time.Time {
+	return ctx.ctx.deadline()
+}
+
+pub fn (mut ctx Context) value(key string) !Val {
+	return ctx.values[key]!
+}
+
+fn (ctx &Context) str() string {
+	return ''
+}
+
+fn (mut ctx Context) done() chan int {
+	return ctx.ctx.done()
 }
 
 pub fn (mut ctx Context) next() ! {
@@ -173,10 +193,6 @@ pub fn (mut ctx Context) set(key string, value Val) {
 	ctx.values[key] = value
 }
 
-pub fn (mut ctx Context) value(key string) !Val {
-	return ctx.values[key]!
-}
-
 pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
 	ctx.resp.header.add(.set_cookie, cookie.str())
 }
@@ -212,7 +228,7 @@ pub fn (mut ctx Context) client_ip() string {
 		ip = ip.all_before(',')
 	}
 
-	// todo 等待暴露netconn
+	// TODO 等待暴露 net conn
 
 	return ip
 }

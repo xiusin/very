@@ -1,10 +1,25 @@
 module very
 
-[heap; noinit]
+import time
+
+[heap; noinit; params]
 struct Configuration {
 mut:
-	port         int    = 8080
-	session_name string = 'V_SESSION_ID'
+	port                       int           = 8080
+	app_name                   string        = 'very'
+	session_name               string        = 'V_SESSION_ID'
+	server_name                string        = 'xiusin/very'
+	read_timeout               time.Duration = time.second * 30
+	write_timeout              time.Duration = time.second * 30
+	idle_timeout               time.Duration = time.second * 30
+	max_request_body_size      i64 = 1024 * 1024 * 20
+	pre_parse_multipart_form   bool
+	disable_keep_alive         bool = true
+	enable_trusted_proxy_check bool
+	trusted_proxies            []string
+	enable_print_routes        bool
+	disable_startup_message    bool
+	strict_routing             bool
 }
 
 pub fn default_configuration() Configuration {
