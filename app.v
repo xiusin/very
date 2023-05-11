@@ -218,11 +218,8 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
-pub fn (mut app GroupRouter) mount[T](mut instance T) {
+pub fn (mut app GroupRouter) mount[T]() {
 	mut di_flag := 'inject: '
-	$if instance !is IController {
-		panic(very.check_implement_err)
-	}
 	mut valid_ctx := false
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
