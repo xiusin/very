@@ -242,15 +242,15 @@ pub fn (mut app GroupRouter) mount[T](mut instance T) {
 		method := method_
 		for _, ano_method in http_methods {
 			app.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
-				mut ctrl := T{}
-				ctrl.ctx = unsafe { ctx }
-				$for field in T.fields {
-					if field.name in injected_fields {
-						ctrl.$(field.name) = unsafe { injected_fields[field.name] }
-					}
-				}
 				$for method__ in T.methods {
 					if method__.name == method.name {
+						mut ctrl := T{}
+						ctrl.ctx = unsafe { ctx }
+						$for field in T.fields {
+							if field.name in injected_fields {
+								ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+							}
+						}
 						ctrl.$method()
 						return
 					}
@@ -267,9 +267,7 @@ fn (mut app Application) handle(req Request) Response {
 	} }
 	mut background := context.background()
 	mut ctx, cancel := context.with_timeout(mut &background, time.second * 4)
-	defer {
-		cancel()
-	}
+
 
 	url.host = req.header.get(.host) or { '' }
 	key := req.method.str() + ';' + url.path
@@ -285,6 +283,11 @@ fn (mut app Application) handle(req Request) Response {
 		params: map[string]string{}
 	}
 
+	defer {
+		req_ctx.finished.close()
+		cancel()
+	}
+
 	if app.cfg.server_name.len > 0 {
 		req_ctx.resp.header.set(.server, app.cfg.server_name)
 	}
@@ -292,7 +295,7 @@ fn (mut app Application) handle(req Request) Response {
 
 	spawn fn [mut app, mut req_ctx, key] () {
 		defer {
-			req_ctx.finished.close()
+			req_ctx.finished <- 0
 		}
 
 		node, params, ok := app.trier.find(key)
@@ -306,7 +309,7 @@ fn (mut app Application) handle(req Request) Response {
 			req_ctx.handler = node.handler_fn()
 
 			if app.cfg.pre_parse_multipart_form {
-				req_ctx.parse_form()!
+				req_ctx.parse_form() or {}
 			}
 
 			req_ctx.mws = app.mws
@@ -320,11 +323,11 @@ fn (mut app Application) handle(req Request) Response {
 
 	done := ctx.done()
 	select {
+		_ := <-req_ctx.finished {}
 		_ := <-done {
 			req_ctx.resp.set_status(.gateway_timeout)
 			println('context canceled')
 		}
-		_ := <-req_ctx.finished {}
 	}
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return req_ctx.resp
