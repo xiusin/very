@@ -285,7 +285,9 @@ fn (mut app Application) handle(req Request) Response {
 		params: map[string]string{}
 	}
 
-	req_ctx.resp.header.set(.server, 'vlang/xiusin-very')
+	if app.cfg.server_name.len > 0 {
+		req_ctx.resp.header.set(.server, app.cfg.server_name.len)
+	}
 	req_ctx.resp.header.set(.connection, 'close')
 
 	spawn fn [mut app, mut req_ctx, key] () {
@@ -358,14 +360,17 @@ pub fn (mut app Application) run() {
 	attrs := [vcolor.Attribute.bg_yellow, .bold, .underline, .bg_green]
 
 	mut color := vcolor.new(...attrs)
-	println(
-		r'
- _  _  ____  ____  _  _ 
-/ )( \(  __)(  _ \( \/ )
-\ \/ / ) _)  )   / )  / 
- \__/ (____)(__\_)(__/  '.trim_left('\n') +
-		very.version + '\n')
-	print(color.sprint('[Very] '))
+
+	if !app.cfg.disable_startup_message {
+		println(
+			r'
+	 _  _  ____  ____  _  _ 
+	/ )( \(  __)(  _ \( \/ )
+	\ \/ / ) _)  )   / )  / 
+	 \__/ (____)(__\_)(__/  '.trim_left('\n') +
+			very.version + '\n')
+		print(color.sprint('[Very] '))
+	}
 
 	spawn app.graceful_shutdown()
 	app.Server.listen_and_serve()
