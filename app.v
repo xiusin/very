@@ -218,27 +218,52 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
-pub fn (mut app GroupRouter) mount[T]() {
+pub fn (mut app GroupRouter) parse_group_attr[T]() string {
+	mut group_route := ''
+	$for f in T.attributes {
+		if f.name == 'group' && f.has_arg && f.arg.len > 0 {
+			if !f.arg.starts_with('/') {
+				panic(error('must'))
+			}
+			group_route = f.arg
+		}
+	}
+	return group_route
+}
+
+fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	mut di_flag := 'inject: '
-	mut valid_ctx := false
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
-		$if field.name == 'ctx' && field.is_mut && field.is_pub {
-			valid_ctx = true
-		}
+		// $if field.name == 'ctx' && field.is_mut && field.is_pub {
+		// 	valid_ctx = true
+		// }
 		services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 		if services.len == 1 {
 			injected_fields[field.name] = app.di.get_voidptr(services[0]) or { panic(err) }
 		}
 	}
-	if !valid_ctx {
-		panic(error('Please set the `pub mut: ctx &very.Context = unsafe { nil }` attribute in struct `${T.name}`'))
+	return injected_fields
+}
+
+pub fn (mut app GroupRouter) mount[T]() ! {
+	injected_fields := app.get_injected_fields[T]()
+	route_prefix := app.parse_group_attr[T]()
+	mut router := if route_prefix.len > 0 {
+		app.group(route_prefix)
+	} else {
+		app
 	}
+
 	$for method_ in T.methods {
-		http_methods, route_path := parse_attrs(method_.name, method_.attrs) or { panic(err) }
+		mut http_methods, route_path := parse_attrs(method_.name, method_.attrs) or { panic(err) }
+		if !http_methods.contains(http.Method.options) {
+			http_methods << http.Method.options
+		}
+
 		method := method_
 		for _, ano_method in http_methods {
-			app.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
+			router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 				$for method__ in T.methods {
 					if method__.name == method.name {
 						mut ctrl := T{}
@@ -265,7 +290,6 @@ fn (mut app Application) handle(req Request) Response {
 	mut background := context.background()
 	mut ctx, cancel := context.with_timeout(mut &background, time.second * 4)
 
-
 	url.host = req.header.get(.host) or { '' }
 	key := req.method.str() + ';' + url.path
 	mut req_ctx := Context{
@@ -290,42 +314,43 @@ fn (mut app Application) handle(req Request) Response {
 	}
 	req_ctx.resp.header.set(.connection, 'close')
 
-	spawn fn [mut app, mut req_ctx, key] () {
-		defer {
-			req_ctx.finished <- 0
+	// spawn fn [mut app, mut req_ctx, key] () {
+	// 	defer {
+	// 		req_ctx.finished <- 0
+	// 	}
+	//
+	//
+	// }()
+	//
+	node, params, ok := app.trier.find(key)
+	req_ctx.params = params.clone()
+	if !ok {
+		app.not_found_handler(mut req_ctx) or {
+			req_ctx.err = err
+			app.recover_handler(mut req_ctx) or {}
 		}
-
-		node, params, ok := app.trier.find(key)
-		req_ctx.params = params.clone()
-		if !ok {
-			app.not_found_handler(mut req_ctx) or {
-				req_ctx.err = err
-				app.recover_handler(mut req_ctx) or {}
-			}
-		} else {
-			req_ctx.handler = node.handler_fn()
-
-			if app.cfg.pre_parse_multipart_form {
-				req_ctx.parse_form() or {}
-			}
-
-			req_ctx.mws = app.mws
-			req_ctx.mws << node.mws
-			req_ctx.next() or {
-				req_ctx.err = err
-				app.recover_handler(mut req_ctx) or {}
+	} else {
+		req_ctx.handler = node.handler_fn()
+		if app.cfg.pre_parse_multipart_form {
+			req_ctx.parse_form() or {
+				panic(err)
 			}
 		}
-	}()
-
-	done := ctx.done()
-	select {
-		_ := <-req_ctx.finished {}
-		_ := <-done {
-			req_ctx.resp.set_status(.gateway_timeout)
-			println('context canceled')
+		req_ctx.mws = app.mws
+		req_ctx.mws << node.mws
+		req_ctx.next() or {
+			app.recover_handler(mut req_ctx) or {}
 		}
 	}
+
+	// done := ctx.done()
+	// select {
+	// 	_ := <-req_ctx.finished {}
+	// 	_ := <-done {
+	// 		req_ctx.resp.set_status(.gateway_timeout)
+	// 		println('context canceled')
+	// 	}
+	// }
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return req_ctx.resp
 }

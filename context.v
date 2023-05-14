@@ -216,7 +216,10 @@ pub fn (mut ctx Context) header(key http.CommonHeader) string {
 }
 
 pub fn (mut ctx Context) body_parse[T]() !T {
-	return json.decode(T, ctx.req.data)
+	if ctx.req.data.len > 0 {
+		return json.decode(T, ctx.req.data)!
+	}
+	return T{}
 }
 
 pub fn (mut ctx Context) client_ip() string {
