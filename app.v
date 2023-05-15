@@ -1,6 +1,6 @@
 module very
 
-import net.http { Request, Response, ResponseConfig, Server, Status, new_response }
+import net.http { Request, Server, Status }
 import net.urllib
 import log
 import os
@@ -13,11 +13,11 @@ import context
 
 type Handler = fn (mut ctx Context) !
 
-const check_implement_err = error('Must pass in a structure that implements `IController`')
+const check_implement_err = error('Must pass in a structure that implements `AbstractController`')
 
 const version = 'v0.0.0 dev'
 
-pub interface IController {
+pub interface AbstractController {
 	ctx &Context
 }
 
@@ -59,7 +59,7 @@ pub mut:
 	db                orm.Connection
 }
 
-// 获取一个Application实例
+// new 获取一个Application实例
 pub fn new(cfg Configuration) Application {
 	mut app := Application{
 		Server: Server{}
@@ -72,10 +72,10 @@ pub fn new(cfg Configuration) Application {
 		}
 		recover_handler: fn (mut ctx Context) ! {
 			ctx.set_status(.internal_server_error)
-			ctx.text('has err: ${ctx.err}')
+			ctx.text('has err: ${ctx.err}') or {}
 		}
 		not_found_handler: fn (mut ctx Context) ! {
-			ctx.resp = Response{
+			ctx.resp = &Response{
 				body: 'the router ${ctx.req.url} not found'
 			}
 			ctx.resp.set_status(.not_found)
@@ -86,13 +86,13 @@ pub fn new(cfg Configuration) Application {
 	return app
 }
 
-// 注册数据库连接对象
+// use_db 注册数据库连接对象
 [inline]
 pub fn (mut app Application) use_db(mut db orm.Connection) {
 	app.db = db
 }
 
-// 注册全局中间件: 在每个请求都会触发
+// global_use 注册全局中间件: 在每个请求都会触发
 [inline]
 pub fn (mut app Application) global_use(mws ...Handler) {
 	app.global_mws << mws
@@ -246,7 +246,7 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	return injected_fields
 }
 
-pub fn (mut app GroupRouter) mount[T]() ! {
+pub fn (mut app GroupRouter) mount[T]() {
 	injected_fields := app.get_injected_fields[T]()
 	route_prefix := app.parse_group_attr[T]()
 	mut router := if route_prefix.len > 0 {
@@ -260,21 +260,30 @@ pub fn (mut app GroupRouter) mount[T]() ! {
 		if !http_methods.contains(http.Method.options) {
 			http_methods << http.Method.options
 		}
-
 		method := method_
+		dump(method)
 		for _, ano_method in http_methods {
 			router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 				$for method__ in T.methods {
 					if method__.name == method.name {
 						mut ctrl := T{}
-						ctrl.ctx = unsafe { ctx }
+						ctrl.Context = ctx
 						$for field in T.fields {
-							if field.name in injected_fields {
-								ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+							$if field.typ !is Context {
+								if field.name in injected_fields {
+									ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+								}
 							}
 						}
-						ctrl.$method()
-						return
+						$if method.return_type is &Response {
+							println('执行 ${method.typ}')
+							vv := ctrl.$method()
+							dump(vv)
+						} $else $if method.typ is string {
+							vv := ctrl.$method()
+							dump(vv)
+							println('执行 ${method.typ}')
+						}
 					}
 				}
 			})
@@ -283,8 +292,8 @@ pub fn (mut app GroupRouter) mount[T]() ! {
 }
 
 // handle 请求处理
-fn (mut app Application) handle(req Request) Response {
-	mut url := urllib.parse(req.url) or { return Response{
+fn (mut app Application) handle(req Request) http.Response {
+	mut url := urllib.parse(req.url) or { return http.Response{
 		body: '${err}'
 	} }
 	mut background := context.background()
@@ -296,7 +305,7 @@ fn (mut app Application) handle(req Request) Response {
 		req: req
 		ctx: ctx
 		url: url
-		resp: new_response(ResponseConfig{})
+		resp: new_response(app.cfg)
 		di: app.get_di()
 		db: app.db
 		query: http.parse_form(url.raw_query)
@@ -308,11 +317,6 @@ fn (mut app Application) handle(req Request) Response {
 		req_ctx.finished.close()
 		cancel()
 	}
-
-	if app.cfg.server_name.len > 0 {
-		req_ctx.resp.header.set(.server, app.cfg.server_name)
-	}
-	req_ctx.resp.header.set(.connection, 'close')
 
 	// spawn fn [mut app, mut req_ctx, key] () {
 	// 	defer {
@@ -332,15 +336,11 @@ fn (mut app Application) handle(req Request) Response {
 	} else {
 		req_ctx.handler = node.handler_fn()
 		if app.cfg.pre_parse_multipart_form {
-			req_ctx.parse_form() or {
-				panic(err)
-			}
+			req_ctx.parse_form() or { panic(err) }
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or {
-			app.recover_handler(mut req_ctx) or {}
-		}
+		req_ctx.next() or { app.recover_handler(mut req_ctx) or {} }
 	}
 
 	// done := ctx.done()
@@ -352,7 +352,7 @@ fn (mut app Application) handle(req Request) Response {
 	// 	}
 	// }
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
-	return req_ctx.resp
+	return req_ctx.resp.to_http_response()
 }
 
 pub fn (mut app Application) graceful_shutdown() ! {

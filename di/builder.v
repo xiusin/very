@@ -35,10 +35,10 @@ pub fn (mut b Builder) remove(name string) {
 	}
 }
 
-pub fn (mut b Builder)exists(name string) bool {
+pub fn (mut b Builder) exists(name string) bool {
 	mut flag := false
 	lock b.services {
-	 flag = name in b.services
+		flag = name in b.services
 	}
 	return flag
 }
@@ -51,7 +51,6 @@ pub fn (mut b Builder) get_voidptr(name string) !voidptr {
 }
 
 pub fn (mut b Builder) inject_on(ptr voidptr) {
-
 }
 
 pub fn (mut b Builder) get[T](name string) !&T {

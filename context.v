@@ -33,7 +33,7 @@ pub:
 mut:
 	mw_index   int = -1
 	is_stopped bool
-	resp       http.Response
+	resp       &Response = unsafe { nil }
 	query      map[string]string
 	form       map[string]string
 	files      map[string][]http.FileData
@@ -101,11 +101,11 @@ pub fn (mut ctx Context) err() IError {
 }
 
 pub fn (mut ctx Context) get_custom_header(key string) !string {
-	return ctx.writer().header.get_custom(key)!
+	return ctx.resp.header.get_custom(key)!
 }
 
 pub fn (mut ctx Context) get_header(key http.CommonHeader) !string {
-	return ctx.writer().header.get(key)!
+	return ctx.resp.header.get(key)!
 }
 
 pub fn (mut ctx Context) set_status(status_code http.Status) {
@@ -124,13 +124,15 @@ pub fn (mut ctx Context) is_ajax() bool {
 	return ctx.req.header.custom_values('X-Requested-With').contains('XMLHttpRequest')
 }
 
-pub fn (mut ctx Context) json[T](result T) {
+pub fn (mut ctx Context) json[T](result T) !&Response {
 	ctx.resp.header.add(.content_type, 'application/json')
 	ctx.resp.body = json.encode(result)
+	return ctx.resp
 }
 
-pub fn (mut ctx Context) text(result string) {
+pub fn (mut ctx Context) text(result string) !&Response {
 	ctx.resp.body = result
+	return ctx.resp
 }
 
 pub fn (mut ctx Context) bytes(result []byte) {
@@ -151,7 +153,6 @@ pub fn (mut ctx Context) add_query(key string, value string) {
 }
 
 pub fn (mut ctx Context) file(name string) ![]http.FileData {
-	// http.parse_multipart_form()
 	return ctx.files[name] or { return error('不存在上传文件') }
 }
 
@@ -185,8 +186,8 @@ pub fn (mut ctx Context) path() string {
 	return ctx.url.path
 }
 
-pub fn (mut ctx Context) writer() &http.Response {
-	return &ctx.resp
+pub fn (mut ctx Context) response() &Response {
+	return ctx.resp
 }
 
 pub fn (mut ctx Context) set(key string, value Val) {

@@ -22,8 +22,8 @@ mut:
 	strict_routing             bool
 }
 
-pub fn default_configuration() Configuration {
-	return Configuration{}
+pub fn default_configuration() &Configuration {
+	return &Configuration{}
 }
 
 [inline]
