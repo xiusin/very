@@ -15,7 +15,7 @@ type Handler = fn (mut ctx Context) !
 
 const check_implement_err = error('Must pass in a structure that implements `AbstractController`')
 
-const version = 'v0.0.0 dev'
+const version = 'v0.0.1 dev'
 
 pub interface AbstractController {
 	ctx &Context
@@ -165,7 +165,7 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 	}
 }
 
-// group 获取一个路由分组
+// group Get a group router
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	mut group := &GroupRouter{
 		trier: app.trier
@@ -176,19 +176,15 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return group
 }
 
-fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file string) {
+fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
 	cfn := fn (dir string, index_file string) fn (mut ctx Context) ! {
 		return fn [dir, index_file] (mut ctx Context) ! {
 			mut filepath := ctx.param('filepath')
 			if index_file.len > 0 && filepath.len == 0 {
 				filepath = index_file
 			}
-			file := dir.trim('/') + '/' + filepath
-			data := os.read_file(file) or {
-				eprintln('read file ${file} ${err}')
-				ctx.abort(Status.internal_server_error, '${err}')
-				return
-			}
+			file := os.join( dir.trim('/'), filepath)
+			data := os.read_file(file)!
 			ext := os.file_ext(file)
 			if ext in vweb.mime_types {
 				ctx.resp.header.add(.content_type, vweb.mime_types[ext])
@@ -197,13 +193,13 @@ fn (mut app GroupRouter) deep_register(dir string, prefix string, index_file str
 		}
 	}
 
+	// 待优化
 	files := os.ls(dir) or { return }
-	// FIXME need register all files?
 	app.all('${prefix}/*filepath', cfn(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
-			app.deep_register(f_dir, '${prefix}/${file}', index_file)
+			app.register_file(f_dir, '${prefix}/${file}', index_file)
 			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
 		}
 	}
@@ -215,7 +211,7 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	} else {
 		''
 	}
-	app.deep_register(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
+	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
 pub fn (mut app GroupRouter) parse_group_attr[T]() string {
@@ -231,13 +227,20 @@ pub fn (mut app GroupRouter) parse_group_attr[T]() string {
 	return group_route
 }
 
+fn (mut app GroupRouter) is_controller[T]() bool {
+	mut is_controller := false
+	$for field in T.fields {
+		$if field.name == 'Context' {
+			is_controller = true
+		}
+	}
+	return is_controller
+}
+
 fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	mut di_flag := 'inject: '
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
-		// $if field.name == 'ctx' && field.is_mut && field.is_pub {
-		// 	valid_ctx = true
-		// }
 		services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 		if services.len == 1 {
 			injected_fields[field.name] = app.di.get_voidptr(services[0]) or { panic(err) }
@@ -247,8 +250,13 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 }
 
 pub fn (mut app GroupRouter) mount[T]() {
+	if app.is_controller[T]() {
+		panic(very.check_implement_err)
+	}
+
 	injected_fields := app.get_injected_fields[T]()
 	route_prefix := app.parse_group_attr[T]()
+
 	mut router := if route_prefix.len > 0 {
 		app.group(route_prefix)
 	} else {
@@ -261,7 +269,6 @@ pub fn (mut app GroupRouter) mount[T]() {
 			http_methods << http.Method.options
 		}
 		method := method_
-		dump(method)
 		for _, ano_method in http_methods {
 			router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 				$for method__ in T.methods {
@@ -394,9 +401,9 @@ pub fn (mut app Application) run() {
 	if !app.cfg.disable_startup_message {
 		println(
 			r'
-	 _  _  ____  ____  _  _ 
+	 _  _  ____  ____  _  _
 	/ )( \(  __)(  _ \( \/ )
-	\ \/ / ) _)  )   / )  / 
+	\ \/ / ) _)  )   / )  /
 	 \__/ (____)(__\_)(__/  '.trim_left('\n') +
 			very.version + '\n')
 		print(color.sprint('[Very] '))
@@ -404,4 +411,5 @@ pub fn (mut app Application) run() {
 
 	spawn app.graceful_shutdown()
 	app.Server.listen_and_serve()
+}
 }
