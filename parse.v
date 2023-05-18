@@ -7,7 +7,7 @@ const methods_with_form = [http.Method.post, .put, .patch]
 // parse_attrs @from vlib/vweb/parse.v
 fn parse_attrs(name string, attrs []string) !([]http.Method, string) {
 	if attrs.len == 0 {
-		return [http.Method.get], '/${name}'
+		return [http.Method.get], ''
 	}
 
 	mut x := attrs.clone()

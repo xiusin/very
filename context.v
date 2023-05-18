@@ -93,7 +93,8 @@ pub fn (mut ctx Context) handle() ! {
 	defer {
 		ctx.sess.sync()
 	}
-	ctx.handler(mut ctx)!
+	ret := ctx.handler(mut ctx)!
+	dump(ret)
 }
 
 pub fn (mut ctx Context) err() IError {
@@ -124,15 +125,15 @@ pub fn (mut ctx Context) is_ajax() bool {
 	return ctx.req.header.custom_values('X-Requested-With').contains('XMLHttpRequest')
 }
 
-pub fn (mut ctx Context) json[T](result T) !&Response {
+pub fn (mut ctx Context) json[T](result T) !Response {
 	ctx.resp.header.add(.content_type, 'application/json')
 	ctx.resp.body = json.encode(result)
 	return ctx.resp
 }
 
-pub fn (mut ctx Context) text(result string) !&Response {
+pub fn (mut ctx Context) text(result string) !Response {
 	ctx.resp.body = result
-	return ctx.resp
+	return *ctx.resp
 }
 
 pub fn (mut ctx Context) bytes(result []byte) {

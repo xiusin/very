@@ -1,6 +1,6 @@
 module very
 
-import net.http { Request, Server, Status }
+import net.http { Request, Server }
 import net.urllib
 import log
 import os
@@ -11,7 +11,7 @@ import xiusin.vcolor
 import time
 import context
 
-type Handler = fn (mut ctx Context) !
+type Handler = fn (mut ctx Context) !Response
 
 const check_implement_err = error('Must pass in a structure that implements `AbstractController`')
 
@@ -70,15 +70,16 @@ pub fn new(cfg Configuration) Application {
 		logger: log.Log{
 			level: .debug
 		}
-		recover_handler: fn (mut ctx Context) ! {
+		recover_handler: fn (mut ctx Context) !Response {
 			ctx.set_status(.internal_server_error)
-			ctx.text('has err: ${ctx.err}') or {}
+			return ctx.text('has err: ${ctx.err}')!
 		}
-		not_found_handler: fn (mut ctx Context) ! {
+		not_found_handler: fn (mut ctx Context) !Response {
 			ctx.resp = &Response{
 				body: 'the router ${ctx.req.url} not found'
 			}
 			ctx.resp.set_status(.not_found)
+			return ctx.text('not found')!
 		}
 	}
 
@@ -177,19 +178,21 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 }
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
-	cfn := fn (dir string, index_file string) fn (mut ctx Context) ! {
-		return fn [dir, index_file] (mut ctx Context) ! {
+	cfn := fn (dir string, index_file string) fn (mut ctx Context) !Response {
+		return fn [dir, index_file] (mut ctx Context) !Response {
 			mut filepath := ctx.param('filepath')
 			if index_file.len > 0 && filepath.len == 0 {
 				filepath = index_file
 			}
-			file := os.join( dir.trim('/'), filepath)
+			file := os.join_path(dir.trim('/'), filepath)
 			data := os.read_file(file)!
 			ext := os.file_ext(file)
 			if ext in vweb.mime_types {
 				ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 			}
 			ctx.resp.body = data
+
+			return *ctx.resp
 		}
 	}
 
@@ -250,9 +253,9 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 }
 
 pub fn (mut app GroupRouter) mount[T]() {
-	if app.is_controller[T]() {
-		panic(very.check_implement_err)
-	}
+	// if app.is_controller[T]() {
+	// 	panic(very.check_implement_err)
+	// }
 
 	injected_fields := app.get_injected_fields[T]()
 	route_prefix := app.parse_group_attr[T]()
@@ -264,36 +267,36 @@ pub fn (mut app GroupRouter) mount[T]() {
 	}
 
 	$for method_ in T.methods {
-		mut http_methods, route_path := parse_attrs(method_.name, method_.attrs) or { panic(err) }
-		if !http_methods.contains(http.Method.options) {
-			http_methods << http.Method.options
-		}
-		method := method_
-		for _, ano_method in http_methods {
-			router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
-				$for method__ in T.methods {
-					if method__.name == method.name {
-						mut ctrl := T{}
-						ctrl.Context = ctx
-						$for field in T.fields {
-							$if field.typ !is Context {
-								if field.name in injected_fields {
-									ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+		if method_.attrs.len > 0 {
+			mut http_methods, route_path := parse_attrs(method_.name, method_.attrs) or {
+				panic(err)
+			}
+			if !http_methods.contains(http.Method.options) {
+				http_methods << http.Method.options
+			}
+			method := method_
+			for _, ano_method in http_methods {
+				router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) !Response {
+					mut ctrl := T{}
+					ctrl.Context = ctx
+
+					$for method__ in T.methods {
+						if method__.name == method.name {
+							$for field in T.fields {
+								$if field.typ !is Context {
+									if field.name in injected_fields {
+										ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+									}
 								}
 							}
-						}
-						$if method.return_type is &Response {
-							println('执行 ${method.typ}')
-							vv := ctrl.$method()
-							dump(vv)
-						} $else $if method.typ is string {
-							vv := ctrl.$method()
-							dump(vv)
-							println('执行 ${method.typ}')
+							$if method__.is_pub && method__.return_type is Response {
+								return error(ctrl.$method())
+							}
 						}
 					}
-				}
-			})
+					return error('no handler')
+				})
+			}
 		}
 	}
 }
@@ -347,7 +350,10 @@ fn (mut app Application) handle(req Request) http.Response {
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or { app.recover_handler(mut req_ctx) or {} }
+		req_ctx.next() or {
+			print(err)
+			app.recover_handler(mut req_ctx) or {}
+		}
 	}
 
 	// done := ctx.done()
@@ -411,5 +417,4 @@ pub fn (mut app Application) run() {
 
 	spawn app.graceful_shutdown()
 	app.Server.listen_and_serve()
-}
 }
