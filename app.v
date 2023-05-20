@@ -339,6 +339,7 @@ fn (mut app Application) handle(req Request) Response {
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
 		req_ctx.next() or {
+			req_ctx.err = err
 			app.recover_handler(mut req_ctx) or {}
 		}
 	}

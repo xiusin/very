@@ -101,11 +101,11 @@ pub fn (mut ctx Context) err() IError {
 }
 
 pub fn (mut ctx Context) get_custom_header(key string) !string {
-	return ctx.writer().header.get_custom(key)!
+	return ctx.req.header.get_custom(key)!
 }
 
 pub fn (mut ctx Context) get_header(key http.CommonHeader) !string {
-	return ctx.writer().header.get(key)!
+	return ctx.req.header.get(key)!
 }
 
 pub fn (mut ctx Context) set_status(status_code http.Status) {
@@ -232,6 +232,9 @@ pub fn (mut ctx Context) client_ip() string {
 	}
 
 	// TODO 等待暴露 net conn
+	if ip == '' {
+		ip = ctx.req.header.get_custom('Remote-Addr') or { '' }
+	}
 
 	return ip
 }

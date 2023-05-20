@@ -2,7 +2,7 @@ module very
 
 import time
 
-[heap; noinit; params]
+[heap; params]
 pub struct Configuration {
 mut:
 	port                       int           = 8080
