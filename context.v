@@ -9,6 +9,7 @@ import very.di
 import orm
 import context
 import time
+import xiusin.validator
 
 pub type Val = []byte
 	| []f64
@@ -220,6 +221,10 @@ pub fn (mut ctx Context) body_parse[T]() !T {
 		return json.decode(T, ctx.req.data)!
 	}
 	return T{}
+}
+
+pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
+	return validator.validate[T](data)
 }
 
 pub fn (mut ctx Context) client_ip() string {

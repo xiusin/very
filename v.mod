@@ -3,5 +3,8 @@ Module {
 	description: '[Experimental] Express inspired web framework written in V'
 	version: 'develop'
 	license: ''
-	dependencies: []
+	dependencies: [
+	    'xiusin.validator',
+	    'xiusin.vcolor',
+	]
 }
