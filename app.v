@@ -1,6 +1,6 @@
 module very
 
-import net.http { Request, Server }
+import net.http { Request, Response, ResponseConfig, Server, new_response }
 import net.urllib
 import log
 import os
@@ -11,7 +11,7 @@ import xiusin.vcolor
 import time
 import context
 
-type Handler = fn (mut ctx Context) !Response
+type Handler = fn (mut ctx Context) !
 
 const check_implement_err = error('Must pass in a structure that implements `AbstractController`')
 
@@ -70,16 +70,15 @@ pub fn new(cfg Configuration) Application {
 		logger: log.Log{
 			level: .debug
 		}
-		recover_handler: fn (mut ctx Context) !Response {
+		recover_handler: fn (mut ctx Context) ! {
 			ctx.set_status(.internal_server_error)
-			return ctx.text('has err: ${ctx.err}')!
+			ctx.text('has err: ${ctx.err}')
 		}
-		not_found_handler: fn (mut ctx Context) !Response {
-			ctx.resp = &Response{
+		not_found_handler: fn (mut ctx Context) ! {
+			ctx.resp = Response{
 				body: 'the router ${ctx.req.url} not found'
 			}
 			ctx.resp.set_status(.not_found)
-			return ctx.text('not found')!
 		}
 	}
 
@@ -179,7 +178,7 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
 	cfn := fn (dir string, index_file string) fn (mut ctx Context) !Response {
-		return fn [dir, index_file] (mut ctx Context) !Response {
+		return fn [dir, index_file] (mut ctx Context) ! {
 			mut filepath := ctx.param('filepath')
 			if index_file.len > 0 && filepath.len == 0 {
 				filepath = index_file
@@ -191,8 +190,6 @@ fn (mut app GroupRouter) register_file(dir string, prefix string, index_file str
 				ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 			}
 			ctx.resp.body = data
-
-			return *ctx.resp
 		}
 	}
 
@@ -302,8 +299,8 @@ pub fn (mut app GroupRouter) mount[T]() {
 }
 
 // handle 请求处理
-fn (mut app Application) handle(req Request) http.Response {
-	mut url := urllib.parse(req.url) or { return http.Response{
+fn (mut app Application) handle(req Request) Response {
+	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
 	} }
 	mut background := context.background()
@@ -315,7 +312,7 @@ fn (mut app Application) handle(req Request) http.Response {
 		req: req
 		ctx: ctx
 		url: url
-		resp: new_response(app.cfg)
+		resp: new_response(ResponseConfig{})
 		di: app.get_di()
 		db: app.db
 		query: http.parse_form(url.raw_query)
@@ -327,6 +324,11 @@ fn (mut app Application) handle(req Request) http.Response {
 		req_ctx.finished.close()
 		cancel()
 	}
+
+	if app.cfg.server_name.len > 0 {
+		req_ctx.resp.header.set(.server, app.cfg.server_name)
+	}
+	req_ctx.resp.header.set(.connection, 'close')
 
 	// spawn fn [mut app, mut req_ctx, key] () {
 	// 	defer {
@@ -351,7 +353,7 @@ fn (mut app Application) handle(req Request) http.Response {
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
 		req_ctx.next() or {
-			print(err)
+			req_ctx.err = err
 			app.recover_handler(mut req_ctx) or {}
 		}
 	}
@@ -365,7 +367,7 @@ fn (mut app Application) handle(req Request) http.Response {
 	// 	}
 	// }
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
-	return req_ctx.resp.to_http_response()
+	return req_ctx.resp
 }
 
 pub fn (mut app Application) graceful_shutdown() ! {
