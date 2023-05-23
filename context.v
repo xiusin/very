@@ -94,8 +94,7 @@ pub fn (mut ctx Context) handle() ! {
 	defer {
 		ctx.sess.sync()
 	}
-	ret := ctx.handler(mut ctx)!
-	dump(ret)
+	ctx.handler(mut ctx)!
 }
 
 pub fn (mut ctx Context) err() IError {
@@ -178,22 +177,27 @@ pub fn (mut ctx Context) referer() string {
 	return ctx.req.header.get(.referer) or { '' }
 }
 
+[inline]
 pub fn (mut ctx Context) host() string {
 	return ctx.url.host
 }
 
+[inline]
 pub fn (mut ctx Context) path() string {
 	return ctx.url.path
 }
 
+[inline]
 pub fn (mut ctx Context) writer() &http.Response {
 	return &ctx.resp
 }
 
+[inline]
 pub fn (mut ctx Context) set(key string, value Val) {
 	ctx.values[key] = value
 }
 
+[inline]
 pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
 	ctx.resp.header.add(.set_cookie, cookie.str())
 }
@@ -212,6 +216,7 @@ pub fn (mut ctx Context) cookie(key string) !string {
 	return error('Cookie not found')
 }
 
+[inline]
 pub fn (mut ctx Context) header(key http.CommonHeader) string {
 	return ctx.req.header.get(key) or { '' }
 }
@@ -223,6 +228,7 @@ pub fn (mut ctx Context) body_parse[T]() !T {
 	return T{}
 }
 
+[inline]
 pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
 	return validator.validate[T](data)
 }
@@ -235,11 +241,8 @@ pub fn (mut ctx Context) client_ip() string {
 	if ip.contains(',') {
 		ip = ip.all_before(',')
 	}
-
-	// TODO 等待暴露 net conn
 	if ip == '' {
 		ip = ctx.req.header.get_custom('Remote-Addr') or { '' }
 	}
-
 	return ip
 }

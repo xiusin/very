@@ -10,6 +10,7 @@ import orm
 import xiusin.vcolor
 import time
 import context
+import v.reflection
 
 type Handler = fn (mut ctx Context) !
 
@@ -104,7 +105,7 @@ pub fn (mut app GroupRouter) use(mws ...Handler) {
 	app.mws << mws
 }
 
-// 注册get路由
+// get 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
 	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
 	app.options(path, handle, ...mws)
@@ -177,7 +178,7 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 }
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
-	cfn := fn (dir string, index_file string) fn (mut ctx Context) !Response {
+	cfn := fn (dir string, index_file string) fn (mut ctx Context) ! {
 		return fn [dir, index_file] (mut ctx Context) ! {
 			mut filepath := ctx.param('filepath')
 			if index_file.len > 0 && filepath.len == 0 {
@@ -214,7 +215,7 @@ pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...st
 	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
-pub fn (mut app GroupRouter) parse_group_attr[T]() string {
+fn (mut app GroupRouter) parse_group_attr[T]() string {
 	mut group_route := ''
 	$for f in T.attributes {
 		if f.name == 'group' && f.has_arg && f.arg.len > 0 {
@@ -228,13 +229,13 @@ pub fn (mut app GroupRouter) parse_group_attr[T]() string {
 }
 
 fn (mut app GroupRouter) is_controller[T]() bool {
-	mut is_controller := false
 	$for field in T.fields {
-		$if field.name == 'Context' {
-			is_controller = true
+		$if field.name == 'Context'
+			&& reflection.get_type(field.typ).sym.name == 'xiusin.very.Context' {
+			return true
 		}
 	}
-	return is_controller
+	return false
 }
 
 fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
@@ -249,10 +250,14 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	return injected_fields
 }
 
+pub fn (mut app GroupRouter) controller[T]() {
+	app.mount[T]()
+}
+
 pub fn (mut app GroupRouter) mount[T]() {
-	// if app.is_controller[T]() {
-	// 	panic(very.check_implement_err)
-	// }
+	if !app.is_controller[T]() {
+		panic(very.check_implement_err)
+	}
 
 	injected_fields := app.get_injected_fields[T]()
 	route_prefix := app.parse_group_attr[T]()
@@ -273,10 +278,9 @@ pub fn (mut app GroupRouter) mount[T]() {
 			}
 			method := method_
 			for _, ano_method in http_methods {
-				router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) !Response {
+				router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 					mut ctrl := T{}
 					ctrl.Context = ctx
-
 					$for method__ in T.methods {
 						if method__.name == method.name {
 							$for field in T.fields {
@@ -286,12 +290,13 @@ pub fn (mut app GroupRouter) mount[T]() {
 									}
 								}
 							}
-							$if method__.is_pub && method__.return_type is Response {
-								return error(ctrl.$method())
+							$if method__.is_pub && method__.typ is fn () {
+								ctrl.$method() or { return err }
+							} $else {
+								return error('the method is not pub')
 							}
 						}
 					}
-					return error('no handler')
 				})
 			}
 		}

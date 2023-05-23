@@ -8,11 +8,14 @@ pub struct App {
 }
 
 ['/index'; get]
-pub fn (mut app App) app_index() !&very.Response {
-	println('app index')
-	err := error('hello world!')
-	dump(err)
-	return err
+pub fn (mut app App) app_index() ! {
+	return error('hello world!')
+}
+
+['/none'; get]
+pub fn (mut app App) app_none() {
+	println('none action')
+	app.text('none action')
 }
 
 fn main() {
