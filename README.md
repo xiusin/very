@@ -41,16 +41,16 @@ pub struct ApiResponse[T] {
 	data T
 }
 
-[group: '/demo'] # To be implemented
+[group: '/demo']
 struct DemoController {
+    very.Context
 pub mut:
 	userid int
-	ctx    &very.Context = unsafe { nil }
 	db     &sqlite.DB  [inject: 'db'] = unsafe { nil }
 }
 
-['/demo/success'; get]
-pub fn (mut c DemoController) success() {
+['/success'; get]
+pub fn (mut c DemoController) success() ! {
 	if c.userid > 0 {
 		c.ctx.text('success: exists')
 	} else {
@@ -59,8 +59,8 @@ pub fn (mut c DemoController) success() {
 	}
 }
 
-['/demo/success1'; get]
-pub fn (mut c DemoController) success1() {
+['/success1'; get]
+pub fn (mut c DemoController) success1() ! {
 	if c.userid > 0 {
 		c.ctx.text('success1: exists')
 	} else {
@@ -106,7 +106,7 @@ fn main() {
 		ctx.text(ctx.host())
 	})
 
-	app.mount(mut Contrller{})
+	app.controller[Contrller]()
 	app.statics('/', 'statics', 'index.html')
 	app.run()
 }
