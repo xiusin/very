@@ -8,13 +8,9 @@ import vweb
 import very.di
 import orm
 import xiusin.vcolor
-import time
-import context
 import v.reflection
 
 type Handler = fn (mut ctx Context) !
-
-const check_implement_err = error('Must pass in a structure that implements `AbstractController`')
 
 const version = 'v0.0.1 dev'
 
@@ -58,6 +54,7 @@ pub mut:
 	recover_handler   Handler
 	not_found_handler Handler
 	db                orm.Connection
+	pool              Pool[Context]
 }
 
 // new 获取一个Application实例
@@ -66,17 +63,26 @@ pub fn new(cfg Configuration) Application {
 		Server: Server{}
 		cfg: cfg
 		db: unsafe { nil }
-		di: &di.Builder{}
+		di: di.new_builder()
 		trier: new_trie()
 		logger: log.Log{
 			level: .debug
 		}
+		pool: new_pool[Context](fn () &Context {
+			return &Context{
+				err: none
+				resp: unsafe { nil }
+				req: unsafe { nil }
+				di: unsafe { nil }
+				db: unsafe { nil }
+			}
+		})
 		recover_handler: fn (mut ctx Context) ! {
 			ctx.set_status(.internal_server_error)
-			ctx.text('has err: ${ctx.err}')
+			ctx.text('${ctx.err?}')
 		}
 		not_found_handler: fn (mut ctx Context) ! {
-			ctx.resp = Response{
+			ctx.resp = &Response{
 				body: 'the router ${ctx.req.url} not found'
 			}
 			ctx.resp.set_status(.not_found)
@@ -220,7 +226,7 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 	$for f in T.attributes {
 		if f.name == 'group' && f.has_arg && f.arg.len > 0 {
 			if !f.arg.starts_with('/') {
-				panic(error('must'))
+				panic(error('The `group` attr of a struct must begin with a forward slash (/).'))
 			}
 			group_route = f.arg
 		}
@@ -228,7 +234,7 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 	return group_route
 }
 
-fn (mut app GroupRouter) is_controller[T]() bool {
+fn (mut app GroupRouter) mountable[T]() bool {
 	$for field in T.fields {
 		$if field.name == 'Context'
 			&& reflection.get_type(field.typ).sym.name == 'xiusin.very.Context' {
@@ -250,17 +256,58 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	return injected_fields
 }
 
+[inline]
 pub fn (mut app GroupRouter) controller[T]() {
 	app.mount[T]()
 }
 
+fn (mut app GroupRouter) parse_attrs(name string, attrs []string) !([]http.Method, string) {
+	if attrs.len == 0 {
+		return [http.Method.get], ''
+	}
+	mut x := attrs.clone()
+	mut methods := []http.Method{}
+	mut path := ''
+
+	for i := 0; i < x.len; {
+		attr := x[i]
+		attru := attr.to_upper()
+		m := http.method_from_str(attru)
+		if attru == 'GET' || m != .get {
+			methods << m
+			x.delete(i)
+			continue
+		}
+		if attr.starts_with('/') {
+			if path != '' {
+				return IError(http.MultiplePathAttributesError{})
+			}
+			path = attr
+			x.delete(i)
+			continue
+		}
+		i++
+	}
+	if x.len > 0 {
+		return IError(http.UnexpectedExtraAttributeError{
+			attributes: x
+		})
+	}
+	if methods.len == 0 {
+		methods = [http.Method.get]
+	}
+	if path == '' {
+		path = '/${name}'
+	}
+	return methods, path.to_lower()
+}
+
 pub fn (mut app GroupRouter) mount[T]() {
-	if !app.is_controller[T]() {
-		panic(very.check_implement_err)
+	if !app.mountable[T]() {
+		panic('Must pass in a structure that implements `AbstractController`')
 	}
 
-	injected_fields := app.get_injected_fields[T]()
-	route_prefix := app.parse_group_attr[T]()
+	injected_fields, route_prefix := app.get_injected_fields[T](), app.parse_group_attr[T]()
 
 	mut router := if route_prefix.len > 0 {
 		app.group(route_prefix)
@@ -270,14 +317,17 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 	$for method_ in T.methods {
 		if method_.attrs.len > 0 {
-			mut http_methods, route_path := parse_attrs(method_.name, method_.attrs) or {
+			mut http_methods, route_path := app.parse_attrs(method_.name, method_.attrs) or {
 				panic(err)
 			}
+
+			// Automatically appending the Options method.
 			if !http_methods.contains(http.Method.options) {
 				http_methods << http.Method.options
 			}
+
 			method := method_
-			for _, ano_method in http_methods {
+			for ano_method in http_methods {
 				router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
 					mut ctrl := T{}
 					ctrl.Context = ctx
@@ -308,26 +358,28 @@ fn (mut app Application) handle(req Request) Response {
 	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
 	} }
-	mut background := context.background()
-	mut ctx, cancel := context.with_timeout(mut &background, time.second * 4)
-
 	url.host = req.header.get(.host) or { '' }
-	key := req.method.str() + ';' + url.path
-	mut req_ctx := Context{
-		req: req
-		ctx: ctx
-		url: url
-		resp: new_response(ResponseConfig{})
-		di: app.get_di()
-		db: app.db
-		query: http.parse_form(url.raw_query)
-		finished: chan int{}
-		params: map[string]string{}
+
+	mut req_ctx := app.pool.acquire()
+	defer {
+		app.pool.release(req_ctx)
 	}
 
-	defer {
-		req_ctx.finished.close()
-		cancel()
+	mut very_req := new_request(&req, url)
+	key := req.method.str() + ';' + url.path
+
+	mut resp := new_response(ResponseConfig{})
+
+	req_ctx.reset(very_req, resp)
+	req_ctx.di = app.get_di()
+	req_ctx.db = app.db
+
+	if app.cfg.server_name.len > 0 {
+		resp.header.set(.server, app.cfg.server_name)
+	}
+
+	if app.cfg.disable_keep_alive {
+		resp.header.set(.connection, 'close')
 	}
 
 	if app.cfg.server_name.len > 0 {
@@ -335,16 +387,8 @@ fn (mut app Application) handle(req Request) Response {
 	}
 	req_ctx.resp.header.set(.connection, 'close')
 
-	// spawn fn [mut app, mut req_ctx, key] () {
-	// 	defer {
-	// 		req_ctx.finished <- 0
-	// 	}
-	//
-	//
-	// }()
-	//
-	node, params, ok := app.trier.find(key)
-	req_ctx.params = params.clone()
+	node, mut params, ok := app.trier.find(key)
+	req_ctx.params = params.move()
 	if !ok {
 		app.not_found_handler(mut req_ctx) or {
 			req_ctx.err = err
@@ -353,7 +397,7 @@ fn (mut app Application) handle(req Request) Response {
 	} else {
 		req_ctx.handler = node.handler_fn()
 		if app.cfg.pre_parse_multipart_form {
-			req_ctx.parse_form() or { panic(err) }
+			very_req.parse_form() or { panic(err) }
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
@@ -363,16 +407,8 @@ fn (mut app Application) handle(req Request) Response {
 		}
 	}
 
-	// done := ctx.done()
-	// select {
-	// 	_ := <-req_ctx.finished {}
-	// 	_ := <-done {
-	// 		req_ctx.resp.set_status(.gateway_timeout)
-	// 		println('context canceled')
-	// 	}
-	// }
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
-	return req_ctx.resp
+	return resp
 }
 
 pub fn (mut app Application) graceful_shutdown() ! {
@@ -388,27 +424,33 @@ pub fn (mut app Application) register_on_interrupt(cbs ...fn () !) {
 	app.interrupts << cbs
 }
 
-fn (mut app Application) register_signal() {
-	os.signal_opt(.int, fn [mut app] (it os.Signal) {
-		app.quit_ch <- it
-	}) or {}
+fn (mut app Application) signal_handler(it os.Signal) {
+	defer {
+		app.quit_ch.close()
+	}
 
-	os.signal_opt(.kill, fn [mut app] (it os.Signal) {
-		app.quit_ch <- it
-	}) or {}
+	$if debug {
+		vcolor.yellow('Received signal: ${it}')
+	}
+	app.quit_ch <- it
+}
 
-	os.signal_opt(.term, fn [mut app] (it os.Signal) {
-		app.quit_ch <- it
-	}) or {}
+// register_os_signal This function registers the OS signals for interrupt, kill,
+// and termination and sets a signal handler for each of them.
+// It allows the application to gracefully handle these signals and perform necessary actions before shutting down.
+fn (mut app Application) register_os_signal() {
+	os.signal_opt(.int, app.signal_handler) or {}
+	os.signal_opt(.kill, app.signal_handler) or {}
+	os.signal_opt(.term, app.signal_handler) or {}
 }
 
 // run Start web service
 pub fn (mut app Application) run() {
 	app.Server.handler = app
 	app.quit_ch = chan os.Signal{}
-	app.register_signal()
-	attrs := [vcolor.Attribute.bg_yellow, .bold, .underline, .bg_green]
+	app.register_os_signal()
 
+	attrs := [vcolor.Attribute.bg_yellow, .bold, .underline, .bg_green]
 	mut color := vcolor.new(...attrs)
 
 	if !app.cfg.disable_startup_message {

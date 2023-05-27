@@ -110,4 +110,15 @@ fn main() {
 	app.statics('/', 'statics', 'index.html')
 	app.run()
 }
+
+
+V panic: `go net__http__Server_parse_and_respond()`: Resource temporarily unavailable
+v hash: bc88183
+0   controller                          0x000000010d94184d panic_error_number + 77
+1   controller                          0x000000010d9c07a8 net__http__Server_listen_and_serve + 1336
+2   controller                          0x000000010d9c9827 xiusin__very__Application_run + 871
+3   controller                          0x000000010d9cd02a main__main + 346
+4   controller                          0x000000010da9fb7c main + 76
+5   controller                          0x000000010d876084 start + 52
+6   ???                                 0x0000000000000001 0x0 + 1
 ```
