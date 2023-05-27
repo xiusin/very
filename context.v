@@ -116,6 +116,11 @@ pub fn (mut ctx Context) json[T](result T) {
 	ctx.resp.body = json.encode(result)
 }
 
+pub fn (mut ctx Context) json_pretty[T](result T) {
+	ctx.resp.header.add(.content_type, 'application/json')
+	ctx.resp.body = json.encode_pretty(result)
+}
+
 [inline]
 pub fn (mut ctx Context) text(result string) {
 	ctx.resp.body = result
