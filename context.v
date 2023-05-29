@@ -4,8 +4,6 @@ import net.http
 import very.session
 import json
 import log
-import very.di
-import orm
 import xiusin.validator
 
 pub type Val = []byte
@@ -27,11 +25,11 @@ pub type Val = []byte
 
 pub struct Context {
 mut:
+	app 	  &Application
 	mw_index   int = -1
 	is_stopped bool
 	resp       &http.Response
 	params     map[string]string
-	err        ?IError
 	values     map[string]Val = map[string]Val{}
 pub mut:
 	req     &Request
@@ -39,8 +37,14 @@ pub mut:
 	handler Handler
 	sess    session.Session
 	logger  log.Log
-	di      &di.Builder = unsafe { nil }
-	db      orm.Connection
+}
+
+fn new_context() &Context {
+	return &Context{
+		resp: unsafe { nil }
+		req: unsafe { nil }
+		app: unsafe { nil }
+	}
 }
 
 pub fn (mut ctx Context) reset(req &Request, resp &http.Response) {
@@ -50,12 +54,8 @@ pub fn (mut ctx Context) reset(req &Request, resp &http.Response) {
 	ctx.params.clear()
 	ctx.is_stopped = false
 	ctx.mw_index = -1
-	ctx.err = none
+	ctx.mws.clear()
 }
-
-// fn (ctx &Context) deadline() ?time.Time {
-// 	return ctx.ctx.deadline()
-// }
 
 pub fn (mut ctx Context) value(key string) !Val {
 	return ctx.values[key]!
@@ -65,9 +65,24 @@ fn (ctx &Context) str() string {
 	return ''
 }
 
-// fn (mut ctx Context) done() chan int {
-// 	return ctx.ctx.done()
-// }
+pub fn (mut ctx Context) get_db[T]() !T {
+	unsafe {
+		if ctx.app.db_pool != nil  {
+			inst := ctx.app.db_pool.acquire()
+			return T(inst)
+		}
+	}
+
+	return error('db_pool not set')
+}
+
+pub fn (mut ctx Context) put_db(inst voidptr) {
+	unsafe {
+		if ctx.app.db_pool != nil  {
+			ctx.app.db_pool.release(inst)
+		}
+	}
+}
 
 pub fn (mut ctx Context) next() ! {
 	if ctx.is_stopped {

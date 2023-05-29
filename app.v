@@ -1,12 +1,11 @@
 module very
 
-import net.http { Request, Response, ResponseConfig, Server, new_response }
+import net.http { Request, Response, ResponseConfig, new_response }
 import net.urllib
 import log
 import os
 import vweb
 import very.di
-import orm
 import xiusin.vcolor
 import v.reflection
 
@@ -51,35 +50,27 @@ mut:
 pub mut:
 	global_mws        []Handler
 	logger            log.Log
-	recover_handler   Handler
+	recover_handler   fn (mut ctx Context, err IError) !
 	not_found_handler Handler
-	db                orm.Connection
-	pool              Pool[Context]
+	pool              Pool
+	db_pool           &Pool = unsafe { nil }
 }
 
 // new 获取一个Application实例
-pub fn new(cfg Configuration) Application {
-	mut app := Application{
-		Server: Server{}
+pub fn new(cfg Configuration) &Application {
+	mut app := &Application{
 		cfg: cfg
-		db: unsafe { nil }
 		di: di.new_builder()
 		trier: new_trie()
 		logger: log.Log{
 			level: .debug
 		}
-		pool: new_pool[Context](fn () &Context {
-			return &Context{
-				err: none
-				resp: unsafe { nil }
-				req: unsafe { nil }
-				di: unsafe { nil }
-				db: unsafe { nil }
-			}
+		pool: new_pool(fn () &Context {
+			return new_context()
 		})
-		recover_handler: fn (mut ctx Context) ! {
+		recover_handler: fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
-			ctx.text('${ctx.err?}')
+			ctx.text('${err}')
 		}
 		not_found_handler: fn (mut ctx Context) ! {
 			ctx.resp = &Response{
@@ -93,10 +84,9 @@ pub fn new(cfg Configuration) Application {
 	return app
 }
 
-// use_db 注册数据库连接对象
 [inline]
-pub fn (mut app Application) use_db(mut db orm.Connection) {
-	app.db = db
+pub fn (mut app Application) use_db_pool(mut pool Pool) {
+	app.db_pool = unsafe { &pool }
 }
 
 // global_use 注册全局中间件: 在每个请求都会触发
@@ -105,7 +95,7 @@ pub fn (mut app Application) global_use(mws ...Handler) {
 	app.global_mws << mws
 }
 
-// 注册中间件: 匹配到路由时才会执行
+// use 注册中间件: 匹配到路由时才会执行
 [inline]
 pub fn (mut app GroupRouter) use(mws ...Handler) {
 	app.mws << mws
@@ -360,19 +350,19 @@ fn (mut app Application) handle(req Request) Response {
 	} }
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := app.pool.acquire()
+	mut req_ctx := unsafe { &Context(app.pool.acquire()) }
 	defer {
 		app.pool.release(req_ctx)
 	}
 
+	// mut req_ctx := new_context()
 	mut very_req := new_request(&req, url)
 	key := req.method.str() + ';' + url.path
 
 	mut resp := new_response(ResponseConfig{})
 
 	req_ctx.reset(very_req, resp)
-	req_ctx.di = app.get_di()
-	req_ctx.db = app.db
+	req_ctx.app = app
 
 	if app.cfg.server_name.len > 0 {
 		resp.header.set(.server, app.cfg.server_name)
@@ -390,10 +380,7 @@ fn (mut app Application) handle(req Request) Response {
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
 	if !ok {
-		app.not_found_handler(mut req_ctx) or {
-			req_ctx.err = err
-			app.recover_handler(mut req_ctx) or {}
-		}
+		app.not_found_handler(mut req_ctx) or { app.recover_handler(mut req_ctx, err) or {} }
 	} else {
 		req_ctx.handler = node.handler_fn()
 		if app.cfg.pre_parse_multipart_form {
@@ -401,10 +388,8 @@ fn (mut app Application) handle(req Request) Response {
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or {
-			req_ctx.err = err
-			app.recover_handler(mut req_ctx) or {}
-		}
+		req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {
+		} }
 	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')

@@ -27,8 +27,8 @@ pub fn (mut req Request) get_custom_header(key string) !string {
 }
 
 [inline]
-pub fn (mut req Request) get_header(key http.CommonHeader) !string {
-	return req.header.get(key)!
+pub fn (mut req Request) get_header(key http.CommonHeader) string {
+	return req.header.get(key) or { '' }
 }
 
 [inline]
@@ -78,7 +78,7 @@ pub fn (mut req Request) parse_form() ! {
 }
 
 pub fn (mut req Request) cookie(key string) !string {
-	mut cookie_header := req.get_header(.cookie)!
+	mut cookie_header := req.get_header(.cookie)
 	cookie_header = ' ' + cookie_header
 	cookie := if cookie_header.contains(';') {
 		cookie_header.find_between(' ${key}=', ';')
