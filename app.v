@@ -328,6 +328,10 @@ pub fn (mut app GroupRouter) mount[T]() {
 								}
 							}
 							$if method__.is_pub && method__.typ is fn () {
+								// mut methods := reflection.type_of(Test{}).sym.methods
+								// cfg := methods[1].args[1]
+								// dump(cfg)
+								// dump(u32(cfg.typ))
 								ctrl.$method() or { return err }
 							} $else {
 								return error('the method is not pub')

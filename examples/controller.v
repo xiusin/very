@@ -36,7 +36,7 @@ fn main() {
 		println('exit two')
 	})
 
-	app.controller[App]()
+	app.mount[App]()
 
 	spawn fn () {
 		vweb.run(&VApp{}, 8081)
