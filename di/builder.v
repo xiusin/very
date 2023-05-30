@@ -6,7 +6,7 @@ pub interface AbstractBuilder {
 	get_voidptr(string) !voidptr
 }
 
-const default_builder = new_builder()
+const default_builder = new_builder() // like var, if not allow, we can use `__global`
 
 [head]
 pub struct Builder {
@@ -45,16 +45,16 @@ pub fn (mut b Builder) exists(name string) bool {
 
 pub fn (mut b Builder) get_voidptr(name string) !voidptr {
 	lock b.services {
-		return b.services[name].instance
+		if name in b.services {
+			return b.services[name].instance
+		}
+		return error('Unable to find service `${name}`, currently available services are: ${b.services.keys()}')
 	}
-	return error('未找到服务${name}')
-}
-
-pub fn (mut b Builder) inject_on(ptr voidptr) {
+	return error('Unable to find service `${name}`')
 }
 
 pub fn (mut b Builder) get[T](name string) !&T {
-	return unsafe { &T(b.get_voidptr(name)!) }
+	return unsafe { T(b.get_voidptr(name)!) }
 }
 
 pub fn (mut b Builder) str() string {
@@ -71,9 +71,13 @@ pub fn exists(name string) bool {
 	return builder.exists(name)
 }
 
-pub fn set(service Service) {
+pub fn set(name string, instance voidptr) {
 	mut builder := default_builder()
-	builder.set(service)
+
+	builder.set(Service{
+		name: name
+		instance: instance
+	})
 }
 
 pub fn get_voidptr(name string) !voidptr {
@@ -84,4 +88,16 @@ pub fn get_voidptr(name string) !voidptr {
 pub fn get[T](name string) !&T {
 	mut builder := default_builder()
 	return builder.get[T](name)
+}
+
+pub fn inject_on[T](ptr T) {
+	if !T.name.starts_with('&') {
+		panic('argument must be of reference type.')
+	}
+
+	mut builder := default_builder()
+	builder.set(Service{
+		name: T.name
+		instance: ptr
+	})
 }

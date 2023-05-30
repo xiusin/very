@@ -1,52 +1,41 @@
 module very
 
+import runtime
+
 struct Pool {
 mut:
-	objs    shared []voidptr
+	objs    chan voidptr
 	factory fn () voidptr
 }
 
-pub fn new_pool(factory fn () voidptr) &Pool {
+// new_pool  函数创建一个新的池(Pool)对象，使用给定的大小和工厂函数。
+// - size: 池的大小。
+// - factory: 用于填充池的工厂函数。
+// 返回值: &Pool
+pub fn new_pool(size int, factory fn () voidptr) &Pool {
 	return &Pool{
-		objs: []voidptr{}
+		objs: chan voidptr{cap: if size > 1 { size } else { runtime.nr_jobs() }}
 		factory: factory
 	}
 }
 
-pub fn (mut p Pool) len() int {
-	lock p.objs {
-		return p.objs.len
-	}
-
-	return 0
+pub fn (mut p Pool) len() u32 {
+	ch := p.objs
+	return ch.len
 }
 
 pub fn (mut p Pool) acquire() voidptr {
-	lock p.objs {
-		if p.objs.len > 0 {
-			return p.objs.pop()
+	select {
+		mut inst := <-p.objs {
+			dump('${ptr_str(inst)}')
+			return inst
 		}
+		else {}
 	}
-
+	println('工厂函数获取实例')
 	return p.factory()
 }
 
 pub fn (mut p Pool) release(inst voidptr) {
-	lock p.objs {
-		p.objs << inst
-	}
-}
-
-pub fn (mut p Pool) iter(cb fn (voidptr)) {
-	lock p.objs {
-		for obj in p.objs {
-			cb(obj)
-		}
-	}
-}
-
-pub fn (mut p Pool) clear() {
-	lock p.objs {
-		p.objs = []voidptr{}
-	}
+	p.objs.try_push(inst)
 }

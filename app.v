@@ -65,7 +65,7 @@ pub fn new(cfg Configuration) &Application {
 		logger: log.Log{
 			level: .debug
 		}
-		pool: new_pool(fn () &Context {
+		pool: new_pool(0, fn () &Context {
 			return new_context()
 		})
 		recover_handler: fn (mut ctx Context, err IError) ! {
@@ -173,21 +173,23 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return group
 }
 
+fn (mut app GroupRouter) file_handler(mut ctx Context, dir string, index_file string) ! {
+	mut filepath := ctx.param('filepath')
+	if index_file.len > 0 && filepath.len == 0 {
+		filepath = index_file
+	}
+	file := os.join_path(dir.trim('/'), filepath)
+	data := os.read_file(file)!
+	ext := os.file_ext(file)
+	if ext in vweb.mime_types {
+		ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+	}
+	ctx.resp.body = data
+}
+
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
-	cfn := fn (dir string, index_file string) fn (mut ctx Context) ! {
-		return fn [dir, index_file] (mut ctx Context) ! {
-			mut filepath := ctx.param('filepath')
-			if index_file.len > 0 && filepath.len == 0 {
-				filepath = index_file
-			}
-			file := os.join_path(dir.trim('/'), filepath)
-			data := os.read_file(file)!
-			ext := os.file_ext(file)
-			if ext in vweb.mime_types {
-				ctx.resp.header.add(.content_type, vweb.mime_types[ext])
-			}
-			ctx.resp.body = data
-		}
+	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
+		return app.file_handler(ctx, dir, index_file)!
 	}
 
 	// 待优化
@@ -244,11 +246,6 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 		}
 	}
 	return injected_fields
-}
-
-[inline]
-pub fn (mut app GroupRouter) controller[T]() {
-	app.mount[T]()
 }
 
 fn (mut app GroupRouter) parse_attrs(name string, attrs []string) !([]http.Method, string) {
@@ -355,7 +352,6 @@ fn (mut app Application) handle(req Request) Response {
 		app.pool.release(req_ctx)
 	}
 
-	// mut req_ctx := new_context()
 	mut very_req := new_request(&req, url)
 	key := req.method.str() + ';' + url.path
 
@@ -410,12 +406,14 @@ pub fn (mut app Application) register_on_interrupt(cbs ...fn () !) {
 }
 
 fn (mut app Application) signal_handler(it os.Signal) {
+	if app.quit_ch.closed {
+		return
+	}
 	defer {
 		app.quit_ch.close()
 	}
-
 	$if debug {
-		vcolor.yellow('Received signal: ${it}')
+		vcolor.yellow('received signal: ${it}')
 	}
 	app.quit_ch <- it
 }

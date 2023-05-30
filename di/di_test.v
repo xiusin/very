@@ -1,17 +1,18 @@
 module di
 
-// fn test_di() {
-// 	mut ioc := new()
-// 	nn := 'hello world'
-// 	ioc.set(Service{ name: 'service', instance: &nn })
-// 	info := ioc.get[string]('service')?
-// }
-
-pub struct Name {
+struct Person {
 pub mut:
-	age string
+	name string
 }
 
-pub struct Ba {
-	Name
+fn test_di() {
+	nn := 'hello world'
+	set('str', &nn)
+	s1 := &string(get_voidptr('str')!)
+	s2 := &string(get_voidptr('str')!)
+	s3 := &string(get_voidptr('str1')!)
+	assert s1 == s2
+	println('s1 = ${ptr_str(s1)} - ${ptr_str(s2)}')
+
+	inject_on(&Person{ name: 'xiusin' })
 }
