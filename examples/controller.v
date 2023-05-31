@@ -2,6 +2,7 @@ module main
 
 import xiusin.very
 import vweb
+import xiusin.very.di
 
 [group: '/app']
 pub struct App {
@@ -10,6 +11,11 @@ pub struct App {
 
 ['/index'; get]
 pub fn (mut app App) app_index() ! {
+	return error('hello world!')
+}
+
+['/inject'; get]
+pub fn (mut app App) app_inject(db string) ! {
 	return error('hello world!')
 }
 
@@ -29,6 +35,9 @@ pub fn (mut app VApp) hello_api() vweb.Result {
 fn main() {
 	mut app := very.new(very.default_configuration())
 
+	str := ''
+	di.set('string', str)
+	dump(di.get_voidptr('string')!)
 	app.register_on_interrupt(fn () ! {
 		println('exit one')
 	})
@@ -38,8 +47,8 @@ fn main() {
 
 	app.mount[App]()
 
-	spawn fn () {
-		vweb.run(&VApp{}, 8081)
-	}()
+	// spawn fn () {
+	// 	vweb.run(&VApp{}, 8081)
+	// }()
 	app.run()
 }

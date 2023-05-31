@@ -60,7 +60,7 @@ pub mut:
 pub fn new(cfg Configuration) &Application {
 	mut app := &Application{
 		cfg: cfg
-		di: di.new_builder()
+		di: di.default_builder()
 		trier: new_trie()
 		logger: log.Log{
 			level: .debug
@@ -188,20 +188,20 @@ fn (mut app GroupRouter) file_handler(mut ctx Context, dir string, index_file st
 }
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
-	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
-		return app.file_handler(ctx, dir, index_file)!
-	}
-
-	// 待优化
-	files := os.ls(dir) or { return }
-	app.all('${prefix}/*filepath', cfn(dir, index_file))
-	for file in files {
-		f_dir := os.join_path(dir, file)
-		if os.is_dir(f_dir) {
-			app.register_file(f_dir, '${prefix}/${file}', index_file)
-			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
-		}
-	}
+	// cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
+	// 	return app.file_handler(mut ctx, dir, index_file)!
+	// }
+	//
+	// // 待优化
+	// files := os.ls(dir) or { return }
+	// app.all('${prefix}/*filepath', cfn(dir, index_file))
+	// for file in files {
+	// 	f_dir := os.join_path(dir, file)
+	// 	if os.is_dir(f_dir) {
+	// 		app.register_file(f_dir, '${prefix}/${file}', index_file)
+	// 		app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
+	// 	}
+	// }
 }
 
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
@@ -327,14 +327,58 @@ pub fn (mut app GroupRouter) mount[T]() {
 									}
 								}
 							}
-							$if method__.is_pub && method__.typ is fn () {
+							$if method__.is_pub { // && method__.typ is fn ()
+								if method__.args.len > 0 {
+									mut args := []voidptr{}
+									for arg in method__.args {
+										args << di.get_voidptr(reflection.type_symbol_name(arg.typ))!
+									}
+
+									dump(args)
+									// match args.len {
+									// 	1 {
+									// 		ctrl.$method(args[0]) or { return err }
+									// 	}
+									// 	// 2 {
+									// 	// 	ctrl.$method(args[0], args[1]) or { err }
+									// 	// }
+									// 	// 3 {
+									// 	// 	ctrl.$method(args[0], args[1], args[2]) or { err }
+									// 	// }
+									// 	// 4 {
+									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3]) or {
+									// 	// 		err
+									// 	// 	}
+									// 	// }
+									// 	// 5 {
+									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4]) or {
+									// 	// 		err
+									// 	// 	}
+									// 	// }
+									// 	// 6 {
+									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4], args[5]) or {
+									// 	// 		err
+									// 	// 	}
+									// 	// }
+									// 	else {
+									// 		error('${method.name} with more than 6 parameters are not supported')
+									// 	}
+									// }
+
+									ctrl.$method() or { return err }
+								}
+								// else if method__.typ is fn () {
+								// 	ctrl.$method() or { return err }
+								// }
+
+								//
+								// reflection.type_symbol_name()  get name?
 								// mut methods := reflection.type_of(Test{}).sym.methods
 								// cfg := methods[1].args[1]
 								// dump(cfg)
 								// dump(u32(cfg.typ))
-								ctrl.$method() or { return err }
 							} $else {
-								return error('the method is not pub')
+								return error('the method `${method.name}` is not available')
 							}
 						}
 					}
@@ -351,10 +395,12 @@ fn (mut app Application) handle(req Request) Response {
 	} }
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := unsafe { &Context(app.pool.acquire()) }
-	defer {
-		app.pool.release(req_ctx)
-	}
+	// mut req_ctx := unsafe { &Context(app.pool.acquire()) }
+	// defer {
+	// 	app.pool.release(req_ctx)
+	// }
+	//
+	mut req_ctx := new_context()
 
 	mut very_req := new_request(&req, url)
 	key := req.method.str() + ';' + url.path
