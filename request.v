@@ -9,14 +9,14 @@ pub struct Request {
 mut:
 	form  map[string]string
 	files map[string][]http.FileData
-	url   urllib.URL
+	url_  urllib.URL
 	query map[string]string
 }
 
 pub fn new_request(req &http.Request, url urllib.URL) &Request {
 	return &Request{
 		Request: req
-		url: url
+		url_: url
 		query: http.parse_form(url.raw_query)
 	}
 }
@@ -43,12 +43,12 @@ pub fn (mut req Request) referer() string {
 
 [inline]
 pub fn (mut req Request) host() string {
-	return req.url.host
+	return req.url_.host
 }
 
 [inline]
 pub fn (mut req Request) path() string {
-	return req.url.path
+	return req.url_.path
 }
 
 [inline]
