@@ -65,7 +65,7 @@ pub fn new(cfg Configuration) &Application {
 		logger: log.Log{
 			level: .debug
 		}
-		pool: new_pool(0, fn () &Context {
+		pool: new_pool(fn () &Context {
 			return new_context()
 		})
 		recover_handler: fn (mut ctx Context, err IError) ! {
@@ -173,35 +173,37 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return group
 }
 
-fn (mut app GroupRouter) file_handler(mut ctx Context, dir string, index_file string) ! {
-	mut filepath := ctx.param('filepath')
-	if index_file.len > 0 && filepath.len == 0 {
-		filepath = index_file
+fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx Context) ! {
+	return fn [dir, index_file] (mut ctx Context) ! {
+		mut filepath := ctx.param('filepath')
+		if index_file.len > 0 && filepath.len == 0 {
+			filepath = index_file
+		}
+		file := os.join_path(dir.trim('/'), filepath)
+		data := os.read_file(file)!
+		ext := os.file_ext(file)
+		if ext in vweb.mime_types {
+			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+		}
+		ctx.resp.body = data
 	}
-	file := os.join_path(dir.trim('/'), filepath)
-	data := os.read_file(file)!
-	ext := os.file_ext(file)
-	if ext in vweb.mime_types {
-		ctx.resp.header.add(.content_type, vweb.mime_types[ext])
-	}
-	ctx.resp.body = data
 }
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
-	// cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
-	// 	return app.file_handler(mut ctx, dir, index_file)!
-	// }
-	//
-	// // 待优化
-	// files := os.ls(dir) or { return }
-	// app.all('${prefix}/*filepath', cfn(dir, index_file))
-	// for file in files {
-	// 	f_dir := os.join_path(dir, file)
-	// 	if os.is_dir(f_dir) {
-	// 		app.register_file(f_dir, '${prefix}/${file}', index_file)
-	// 		app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
-	// 	}
-	// }
+	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
+		return app.file_handler(dir, index_file)
+	}
+
+	// 待优化
+	files := os.ls(dir) or { return }
+	app.all('${prefix}/*filepath', cfn(dir, index_file))
+	for file in files {
+		f_dir := os.join_path(dir, file)
+		if os.is_dir(f_dir) {
+			app.register_file(f_dir, '${prefix}/${file}', index_file)
+			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
+		}
+	}
 }
 
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
@@ -327,46 +329,45 @@ pub fn (mut app GroupRouter) mount[T]() {
 									}
 								}
 							}
-							$if method__.is_pub { // && method__.typ is fn ()
-								if method__.args.len > 0 {
-									mut args := []voidptr{}
-									for arg in method__.args {
-										args << di.get_voidptr(reflection.type_symbol_name(arg.typ))!
-									}
-
-									dump(args)
-									// match args.len {
-									// 	1 {
-									// 		ctrl.$method(args[0]) or { return err }
-									// 	}
-									// 	// 2 {
-									// 	// 	ctrl.$method(args[0], args[1]) or { err }
-									// 	// }
-									// 	// 3 {
-									// 	// 	ctrl.$method(args[0], args[1], args[2]) or { err }
-									// 	// }
-									// 	// 4 {
-									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3]) or {
-									// 	// 		err
-									// 	// 	}
-									// 	// }
-									// 	// 5 {
-									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4]) or {
-									// 	// 		err
-									// 	// 	}
-									// 	// }
-									// 	// 6 {
-									// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4], args[5]) or {
-									// 	// 		err
-									// 	// 	}
-									// 	// }
-									// 	else {
-									// 		error('${method.name} with more than 6 parameters are not supported')
-									// 	}
-									// }
-
-									ctrl.$method() or { return err }
-								}
+							$if method__.is_pub && method__.typ is fn () {
+								// if method__.args.len > 0 { // 目前无法动态注入参数 - 类型无法支持
+								// 	mut args := []voidptr{}
+								// 	for arg in method__.args {
+								// 		args << di.get_voidptr(reflection.type_symbol_name(arg.typ))! // Demote to Voidptr?
+								// 	}
+								//
+								// 	dump(args)
+								// match args.len {
+								// 	1 {
+								// 		ctrl.$method(args[0]) or { return err }
+								// 	}
+								// 	// 2 {
+								// 	// 	ctrl.$method(args[0], args[1]) or { err }
+								// 	// }
+								// 	// 3 {
+								// 	// 	ctrl.$method(args[0], args[1], args[2]) or { err }
+								// 	// }
+								// 	// 4 {
+								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3]) or {
+								// 	// 		err
+								// 	// 	}
+								// 	// }
+								// 	// 5 {
+								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4]) or {
+								// 	// 		err
+								// 	// 	}
+								// 	// }
+								// 	// 6 {
+								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4], args[5]) or {
+								// 	// 		err
+								// 	// 	}
+								// 	// }
+								// 	else {
+								// 		error('${method.name} with more than 6 parameters are not supported')
+								// 	}
+								// }
+								ctrl.$method() or { return err }
+								// }
 								// else if method__.typ is fn () {
 								// 	ctrl.$method() or { return err }
 								// }
@@ -395,11 +396,6 @@ fn (mut app Application) handle(req Request) Response {
 	} }
 	url.host = req.header.get(.host) or { '' }
 
-	// mut req_ctx := unsafe { &Context(app.pool.acquire()) }
-	// defer {
-	// 	app.pool.release(req_ctx)
-	// }
-	//
 	mut req_ctx := new_context()
 
 	mut very_req := new_request(&req, url)
@@ -414,9 +410,9 @@ fn (mut app Application) handle(req Request) Response {
 		resp.header.set(.server, app.cfg.server_name)
 	}
 
-	if app.cfg.disable_keep_alive {
-		resp.header.set(.connection, 'close')
-	}
+	// if app.cfg.disable_keep_alive {
+	// 	resp.header.set(.connection, 'close')
+	// }
 
 	if app.cfg.server_name.len > 0 {
 		req_ctx.resp.header.set(.server, app.cfg.server_name)
