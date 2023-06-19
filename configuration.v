@@ -1,6 +1,7 @@
 module very
 
 import time
+import log
 
 [heap; params]
 pub struct Configuration {
@@ -9,6 +10,7 @@ mut:
 	app_name                   string        = 'very'
 	session_name               string        = 'V_SESSION_ID'
 	server_name                string        = 'xiusin/very'
+	accept_timeout             time.Duration = time.second * 30
 	read_timeout               time.Duration = time.second * 30
 	write_timeout              time.Duration = time.second * 30
 	idle_timeout               time.Duration = time.second * 30
@@ -20,6 +22,8 @@ mut:
 	enable_print_routes        bool
 	disable_startup_message    bool
 	strict_routing             bool
+	logger_level               log.Level = log.Level.debug
+	logger_path                string
 }
 
 pub fn default_configuration() &Configuration {

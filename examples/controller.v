@@ -7,6 +7,10 @@ import xiusin.very.di
 [group: '/app']
 pub struct App {
 	very.Context
+pub mut:
+	hello &string [inject: 'string']
+	// no_inject &string [inject: '_string']
+	xbn int [inject: 'string']
 }
 
 ['/index'; get]
@@ -15,8 +19,8 @@ pub fn (mut app App) app_index() ! {
 }
 
 ['/inject'; get]
-pub fn (mut app App) app_inject(db string) ! {
-	return error('hello world!')
+pub fn (mut app App) app_inject() ! {
+	return error('${ptr_str(app.hello)} - ${ptr_str(app.xbn)} - ${app.xbn}')
 }
 
 ['/none'; get]
@@ -34,21 +38,10 @@ pub fn (mut app VApp) hello_api() vweb.Result {
 
 fn main() {
 	mut app := very.new(very.default_configuration())
-
-	str := ''
-	di.set('string', str)
-	dump(di.get_voidptr('string')!)
-	app.register_on_interrupt(fn () ! {
-		println('exit one')
-	})
-	app.register_on_interrupt(fn () ! {
-		println('exit two')
-	})
-
+	a := 'hello world'
+	i := 100
+	di.set('string', &a)
+	di.set('int', &i)
 	app.mount[App]()
-
-	// spawn fn () {
-	// 	vweb.run(&VApp{}, 8081)
-	// }()
 	app.run()
 }

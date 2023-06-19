@@ -25,7 +25,7 @@ pub type Val = []byte
 
 pub struct Context {
 mut:
-	app 	  &Application
+	app        &Application
 	mw_index   int = -1
 	is_stopped bool
 	resp       &http.Response
@@ -36,7 +36,7 @@ pub mut:
 	mws     []Handler
 	handler Handler
 	sess    session.Session
-	logger  log.Log
+	logger  &log.Log = unsafe { nil }
 }
 
 fn new_context() &Context {
@@ -67,18 +67,17 @@ fn (ctx &Context) str() string {
 
 pub fn (mut ctx Context) get_db[T]() !T {
 	unsafe {
-		if ctx.app.db_pool != nil  {
+		if ctx.app.db_pool != nil {
 			inst := ctx.app.db_pool.acquire()
 			return T(inst)
 		}
 	}
-
 	return error('db_pool not set')
 }
 
 pub fn (mut ctx Context) put_db(inst voidptr) {
 	unsafe {
-		if ctx.app.db_pool != nil  {
+		if ctx.app.db_pool != nil {
 			ctx.app.db_pool.release(inst)
 		}
 	}
@@ -161,6 +160,7 @@ pub fn (mut ctx Context) writer() &http.Response {
 	return ctx.resp
 }
 
+[inline]
 pub fn (mut ctx Context) request() &Request {
 	return ctx.req
 }
@@ -180,6 +180,7 @@ pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
 	ctx.resp.header.add(.set_cookie, cookie.str())
 }
 
+[inline]
 pub fn (mut ctx Context) body_parse[T]() !T {
 	return ctx.req.body_parse[T]()
 }

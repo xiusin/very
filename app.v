@@ -49,7 +49,7 @@ mut:
 	interrupts []fn () !
 pub mut:
 	global_mws        []Handler
-	logger            log.Log
+	logger            &log.Log
 	recover_handler   fn (mut ctx Context, err IError) !
 	not_found_handler Handler
 	pool              Pool
@@ -62,8 +62,8 @@ pub fn new(cfg Configuration) &Application {
 		cfg: cfg
 		di: di.default_builder()
 		trier: new_trie()
-		logger: log.Log{
-			level: .debug
+		logger: &log.Log{
+			level: cfg.logger_level
 		}
 		pool: new_pool(fn () &Context {
 			return new_context()
@@ -80,7 +80,12 @@ pub fn new(cfg Configuration) &Application {
 		}
 	}
 
-	app.Server.port = app.cfg.get_port()
+	if app.cfg.logger_path.len > 0 {
+		app.logger.set_full_logpath(app.cfg.logger_path)
+	}
+
+	di.set('logger', app.logger)
+
 	return app
 }
 
@@ -330,54 +335,7 @@ pub fn (mut app GroupRouter) mount[T]() {
 								}
 							}
 							$if method__.is_pub && method__.typ is fn () {
-								// if method__.args.len > 0 { // 目前无法动态注入参数 - 类型无法支持
-								// 	mut args := []voidptr{}
-								// 	for arg in method__.args {
-								// 		args << di.get_voidptr(reflection.type_symbol_name(arg.typ))! // Demote to Voidptr?
-								// 	}
-								//
-								// 	dump(args)
-								// match args.len {
-								// 	1 {
-								// 		ctrl.$method(args[0]) or { return err }
-								// 	}
-								// 	// 2 {
-								// 	// 	ctrl.$method(args[0], args[1]) or { err }
-								// 	// }
-								// 	// 3 {
-								// 	// 	ctrl.$method(args[0], args[1], args[2]) or { err }
-								// 	// }
-								// 	// 4 {
-								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3]) or {
-								// 	// 		err
-								// 	// 	}
-								// 	// }
-								// 	// 5 {
-								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4]) or {
-								// 	// 		err
-								// 	// 	}
-								// 	// }
-								// 	// 6 {
-								// 	// 	ctrl.$method(args[0], args[1], args[2], args[3], args[4], args[5]) or {
-								// 	// 		err
-								// 	// 	}
-								// 	// }
-								// 	else {
-								// 		error('${method.name} with more than 6 parameters are not supported')
-								// 	}
-								// }
 								ctrl.$method() or { return err }
-								// }
-								// else if method__.typ is fn () {
-								// 	ctrl.$method() or { return err }
-								// }
-
-								//
-								// reflection.type_symbol_name()  get name?
-								// mut methods := reflection.type_of(Test{}).sym.methods
-								// cfg := methods[1].args[1]
-								// dump(cfg)
-								// dump(u32(cfg.typ))
 							} $else {
 								return error('the method `${method.name}` is not available')
 							}
@@ -394,6 +352,16 @@ fn (mut app Application) handle(req Request) Response {
 	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
 	} }
+
+	if app.cfg.max_request_body_size > 0 {
+		content_length := req.header.get(.content_length) or { '0' }.u64()
+		if app.cfg.max_request_body_size < content_length {
+			return Response{
+				body: 'request body size too large!'
+			}
+		}
+	}
+
 	url.host = req.header.get(.host) or { '' }
 
 	mut req_ctx := new_context()
@@ -405,19 +373,15 @@ fn (mut app Application) handle(req Request) Response {
 
 	req_ctx.reset(very_req, resp)
 	req_ctx.app = app
+	req_ctx.logger = unsafe { app.logger }
 
-	if app.cfg.server_name.len > 0 {
-		resp.header.set(.server, app.cfg.server_name)
+	if app.cfg.disable_keep_alive {
+		resp.header.set(.connection, 'close')
 	}
-
-	// if app.cfg.disable_keep_alive {
-	// 	resp.header.set(.connection, 'close')
-	// }
 
 	if app.cfg.server_name.len > 0 {
 		req_ctx.resp.header.set(.server, app.cfg.server_name)
 	}
-	req_ctx.resp.header.set(.connection, 'close')
 
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
@@ -425,6 +389,7 @@ fn (mut app Application) handle(req Request) Response {
 		app.not_found_handler(mut req_ctx) or { app.recover_handler(mut req_ctx, err) or {} }
 	} else {
 		req_ctx.handler = node.handler_fn()
+
 		if app.cfg.pre_parse_multipart_form {
 			very_req.parse_form() or { panic(err) }
 		}
@@ -476,6 +441,12 @@ fn (mut app Application) register_os_signal() {
 // run Start web service
 pub fn (mut app Application) run() {
 	app.Server.handler = app
+
+	app.Server.port = app.cfg.port
+	app.Server.accept_timeout = app.cfg.accept_timeout
+	app.Server.write_timeout = app.cfg.write_timeout
+	app.Server.read_timeout = app.cfg.read_timeout
+
 	app.quit_ch = chan os.Signal{}
 	app.register_os_signal()
 
@@ -490,7 +461,7 @@ pub fn (mut app Application) run() {
 	\ \/ / ) _)  )   / )  /
 	 \__/ (____)(__\_)(__/  '.trim_left('\n') +
 			very.version + '\n')
-		print(color.sprint('[Very] '))
+		print(color.sprint('[' + app.cfg.app_name + '] '))
 	}
 
 	spawn app.graceful_shutdown()

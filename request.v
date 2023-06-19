@@ -32,11 +32,6 @@ pub fn (mut req Request) get_header(key http.CommonHeader) string {
 }
 
 [inline]
-pub fn (mut req Request) is_ajax() bool {
-	return req.header.custom_values('X-Requested-With').contains('XMLHttpRequest')
-}
-
-[inline]
 pub fn (mut req Request) referer() string {
 	return req.header.get(.referer) or { '' }
 }
