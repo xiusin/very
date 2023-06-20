@@ -23,6 +23,12 @@ pub fn (mut app App) app_inject() ! {
 	return error('${ptr_str(app.hello)} - ${ptr_str(app.xbn)} - ${app.xbn}')
 }
 
+['/app_html'; get]
+pub fn (mut app App) app_html() ! {
+	message := 'hello app html'
+	app.html($tmpl('example.html'))
+}
+
 ['/none'; get]
 pub fn (mut app App) app_none() {
 	app.text('hello world!')
