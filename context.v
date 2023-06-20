@@ -36,7 +36,7 @@ pub mut:
 	mws     []Handler
 	handler Handler
 	sess    session.Session
-	logger  &log.Log = unsafe { nil }
+	logger  log.Logger
 }
 
 fn new_context() &Context {
@@ -44,6 +44,7 @@ fn new_context() &Context {
 		resp: unsafe { nil }
 		req: unsafe { nil }
 		app: unsafe { nil }
+		logger: unsafe { nil }
 	}
 }
 
@@ -168,6 +169,11 @@ pub fn (mut ctx Context) request() &Request {
 [inline]
 pub fn (mut ctx Context) param(key string) string {
 	return ctx.params[key] or { '' }
+}
+
+[inline]
+pub fn (mut ctx Context) set_param(key string, value string) {
+	ctx.params[key] = value
 }
 
 [inline]

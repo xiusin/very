@@ -74,7 +74,8 @@ fn main() {
 	mut db := sqlite.connect('database.db') or { panic(err) }
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
-	app.di.set(di.Service{
+
+    app.di.set(di.Service{
 		name: 'db'
 		instance: &db
 	})
@@ -106,7 +107,7 @@ fn main() {
 		ctx.text(ctx.host())
 	})
 
-	app.controller[Contrller]()
+	app.mount[DemoController]()
 	app.statics('/', 'statics', 'index.html')
 	app.run()
 }

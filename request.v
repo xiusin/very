@@ -66,6 +66,7 @@ pub fn (mut req Request) form(name string) string {
 	return req.form[name] or { '' }
 }
 
+[inline]
 pub fn (mut req Request) parse_form() ! {
 	if req.form.len == 0 {
 		req.form, req.files = req.parse_form_from_request() or { return err }

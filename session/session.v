@@ -1,15 +1,18 @@
 module session
 
 import rand
+import sync
 
+[head]
 pub struct Session {
 mut:
+	mu   &sync.Mutex = unsafe { sync.new_mutex() }
 	id   string
 	data map[string]string
 }
 
-pub fn new_session(id string) Session {
-	mut sess := Session{
+pub fn new_session(id string) &Session {
+	mut sess := &Session{
 		id: id
 	}
 	sess.load()

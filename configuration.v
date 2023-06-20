@@ -26,6 +26,7 @@ mut:
 	logger_path                string
 }
 
+[inline]
 pub fn default_configuration() &Configuration {
 	return &Configuration{}
 }

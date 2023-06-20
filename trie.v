@@ -106,9 +106,7 @@ fn find_node(node &Node, segments []string, mut params map[string]string) &Node 
 				continue
 			}
 			mut child := children[m] or { continue }
-			// 检查是否可以匹配路由
 			if child.re.matches_string(segments[0]) {
-				// 查找路由内容
 				res := child.re.find_all_str(segments[0])
 				flag = true
 				if child.param_name.len > 0 {

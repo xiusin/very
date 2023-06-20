@@ -49,7 +49,7 @@ mut:
 	interrupts []fn () !
 pub mut:
 	global_mws        []Handler
-	logger            &log.Log
+	logger            log.Logger
 	recover_handler   fn (mut ctx Context, err IError) !
 	not_found_handler Handler
 	pool              Pool
@@ -58,13 +58,18 @@ pub mut:
 
 // new 获取一个Application实例
 pub fn new(cfg Configuration) &Application {
+	mut logger := &log.Log{
+		level: cfg.logger_level
+	}
+	if cfg.logger_path.len > 0 {
+		logger.set_full_logpath(cfg.logger_path)
+	}
+
 	mut app := &Application{
 		cfg: cfg
 		di: di.default_builder()
 		trier: new_trie()
-		logger: &log.Log{
-			level: cfg.logger_level
-		}
+		logger: unsafe { nil }
 		pool: new_pool(fn () &Context {
 			return new_context()
 		})
@@ -80,13 +85,15 @@ pub fn new(cfg Configuration) &Application {
 		}
 	}
 
-	if app.cfg.logger_path.len > 0 {
-		app.logger.set_full_logpath(app.cfg.logger_path)
-	}
-
-	di.set('logger', app.logger)
+	app.use_logger(logger)
 
 	return app
+}
+
+[inline]
+pub fn (mut app Application) use_logger(logger log.Logger) {
+	app.logger = logger
+	di.set('logger', app.logger)
 }
 
 [inline]
@@ -117,6 +124,7 @@ pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
 	app.options(path, handle, ...mws)
 }
 
+[inline]
 pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler) {
 	app.trier.add('OPTIONS;' + app.get_with_prefix(path), handle, mws)
 }
@@ -233,6 +241,7 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 	return group_route
 }
 
+// mountable
 fn (mut app GroupRouter) mountable[T]() bool {
 	$for field in T.fields {
 		$if field.name == 'Context'
@@ -315,7 +324,6 @@ pub fn (mut app GroupRouter) mount[T]() {
 				panic(err)
 			}
 
-			// Automatically appending the Options method.
 			if !http_methods.contains(http.Method.options) {
 				http_methods << http.Method.options
 			}
@@ -347,7 +355,7 @@ pub fn (mut app GroupRouter) mount[T]() {
 	}
 }
 
-// handle 请求处理
+// handle
 fn (mut app Application) handle(req Request) Response {
 	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
@@ -405,10 +413,13 @@ fn (mut app Application) handle(req Request) Response {
 
 pub fn (mut app Application) graceful_shutdown() ! {
 	_ := <-app.quit_ch
+	defer {
+		app.close()
+	}
+
 	for interrupt_fn in app.interrupts {
 		interrupt_fn()!
 	}
-	app.close()
 }
 
 [inline]
