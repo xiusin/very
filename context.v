@@ -34,7 +34,7 @@ mut:
 pub mut:
 	req     &Request
 	mws     []Handler
-	handler Handler
+	handler Handler = unsafe { nil }
 	sess    session.Session
 	logger  log.Logger
 }

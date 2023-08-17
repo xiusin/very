@@ -132,7 +132,7 @@ fn find_node(node &Node, segments []string, mut params map[string]string) &Node 
 
 	mut nsegments := []string{}
 	if segments.len > 1 {
-		nsegments = segments[1..]
+		nsegments = unsafe { segments[1..] }
 	}
 	return find_node(n, nsegments, mut params)
 }

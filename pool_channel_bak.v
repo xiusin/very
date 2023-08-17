@@ -5,7 +5,7 @@ import runtime
 struct PoolChannel {
 mut:
 	objs    chan voidptr
-	factory fn () voidptr
+	factory fn () voidptr = unsafe { nil }
 }
 
 // new_pool  函数创建一个新的池(Pool)对象，使用给定的大小和工厂函数。

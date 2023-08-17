@@ -1,7 +1,6 @@
 module main
 
 import xiusin.very
-import vweb
 import xiusin.very.di
 
 [group: '/app']
@@ -32,14 +31,6 @@ pub fn (mut app App) app_html() ! {
 ['/none'; get]
 pub fn (mut app App) app_none() {
 	app.text('hello world!')
-}
-
-struct VApp {
-	vweb.Context
-}
-
-pub fn (mut app VApp) hello_api() vweb.Result {
-	return app.text('hello world')
 }
 
 fn main() {

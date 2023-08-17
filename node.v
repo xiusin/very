@@ -16,7 +16,7 @@ mut:
 	re         &regex.RE = unsafe { nil }
 	parent     &Node     = unsafe { nil }
 	mws        []Handler
-	handler    Handler
+	handler    Handler = unsafe { nil }
 	term_count int
 }
 

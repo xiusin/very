@@ -50,8 +50,8 @@ mut:
 pub mut:
 	global_mws        []Handler
 	logger            log.Logger
-	recover_handler   fn (mut ctx Context, err IError) !
-	not_found_handler Handler
+	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
+	not_found_handler Handler = unsafe { nil }
 	pool              Pool
 	db_pool           &Pool = unsafe { nil }
 }
@@ -403,8 +403,11 @@ fn (mut app Application) handle(req Request) Response {
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {
-		} }
+		req_ctx.next() or {
+			print_backtrace()
+			app.logger.error('handle err: ${err}')
+			app.recover_handler(mut req_ctx, err) or {}
+		}
 	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
@@ -453,7 +456,7 @@ fn (mut app Application) register_os_signal() {
 pub fn (mut app Application) run() {
 	app.Server.handler = app
 
-	app.Server.port = app.cfg.port
+	app.Server.addr = ':${app.cfg.port}'
 	app.Server.accept_timeout = app.cfg.accept_timeout
 	app.Server.write_timeout = app.cfg.write_timeout
 	app.Server.read_timeout = app.cfg.read_timeout

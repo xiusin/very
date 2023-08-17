@@ -3,7 +3,7 @@ module very
 struct Pool {
 mut:
 	objs    shared []voidptr
-	factory fn () voidptr
+	factory fn () voidptr = unsafe { nil }
 }
 
 pub fn new_pool(factory fn () voidptr) &Pool {
