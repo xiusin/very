@@ -4,7 +4,6 @@ import net.http
 import very.session
 import json
 import log
-import xiusin.validator
 
 pub type Val = []byte
 	| []f64
@@ -64,28 +63,6 @@ pub fn (mut ctx Context) value(key string, default_value ...Val) !Val {
 			default_value[0]
 		} else {
 			return error('Context.value(${key}) not exist')
-		}
-	}
-}
-
-fn (ctx &Context) str() string {
-	return ''
-}
-
-pub fn (mut ctx Context) get_db[T]() !T {
-	unsafe {
-		if ctx.app.db_pool != nil {
-			inst := ctx.app.db_pool.acquire()
-			return T(inst)
-		}
-	}
-	return error('db_pool not set')
-}
-
-pub fn (mut ctx Context) put_db(inst voidptr) {
-	unsafe {
-		if ctx.app.db_pool != nil {
-			ctx.app.db_pool.release(inst)
 		}
 	}
 }
@@ -197,7 +174,7 @@ pub fn (mut ctx Context) body_parse[T]() !T {
 	return ctx.req.body_parse[T]()
 }
 
-[inline]
-pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
-	return validator.validate[T](data)
-}
+// [inline]
+// pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
+// 	return validator.validate[T](data)
+// }

@@ -2,6 +2,7 @@ module main
 
 import xiusin.very
 import xiusin.very.di
+import xiusin.very.middleware
 import log
 
 [group: '/app']
@@ -51,6 +52,11 @@ fn main() {
 	di.inject_on(&a, 'string')
 	di.inject_on(&i, 'int')
 
-	app.mount[App]()
+	app.use(middleware.logger, middleware.cors()) // use middleware
+
+	mut asset := byte_file_data()
+	app.embed_statics('/dist', mut asset)
+
+	app.mount[App]() // mount controller
 	app.run()
 }

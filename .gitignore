@@ -2,3 +2,6 @@
 bin/
 *.db
 examples/example
+examples/examples
+/examples/bindata.v
+/examples/dist/*

@@ -10,10 +10,10 @@ mut:
 	app_name                   string        = 'very'
 	session_name               string        = 'V_SESSION_ID'
 	server_name                string        = 'xiusin/very'
-	accept_timeout             time.Duration = time.second * 30
-	read_timeout               time.Duration = time.second * 30
-	write_timeout              time.Duration = time.second * 30
-	idle_timeout               time.Duration = time.second * 30
+	accept_timeout             time.Duration = time.second * 300
+	read_timeout               time.Duration = time.second * 300
+	write_timeout              time.Duration = time.second * 300
+	idle_timeout               time.Duration = time.second * 300
 	max_request_body_size      i64 = 1024 * 1024 * 20
 	pre_parse_multipart_form   bool
 	disable_keep_alive         bool = true

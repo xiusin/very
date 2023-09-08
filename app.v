@@ -218,12 +218,24 @@ fn (mut app GroupRouter) register_file(dir string, prefix string, index_file str
 	}
 }
 
+pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
+	app.all('${prefix}/*filepath', fn [mut asset] (mut ctx Context) ! {
+		mut file := ctx.param('filepath')
+
+		data := asset.find(file) or {
+			file = if file == '' { 'index.html' } else { '${file}/index.html' }
+			asset.find(file)!
+		}
+		ext := os.file_ext(file)
+		if ext in vweb.mime_types {
+			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+		}
+		ctx.resp.body = data.data.bytestr()
+	})
+}
+
 pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
-	default_index_file := if index_file.len > 0 {
-		index_file[0]
-	} else {
-		''
-	}
+	default_index_file := if index_file.len > 0 { index_file[0] } else { '' }
 	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
 }
 
@@ -255,7 +267,8 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
 		$if field.typ !is Context {
-			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
+			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag,
+				''))
 			if services.len == 1 {
 				sym := reflection.get_type_symbol(field.typ) or {
 					reflection.TypeSymbol{

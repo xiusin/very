@@ -4,7 +4,6 @@ Module {
 	version: 'develop'
 	license: ''
 	dependencies: [
-	    'xiusin.validator',
 	    'xiusin.vcolor',
 	]
 }

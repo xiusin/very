@@ -10,7 +10,6 @@ Express inspired web framework written in V with `net.http.server` module.
 module main
 
 import xiusin.very
-import xiusin.very.di
 import db.sqlite
 
 [table: 'users']
@@ -72,8 +71,8 @@ pub fn (mut c DemoController) success1() ! {
 fn main() {
 	mut app := very.new(very.default_configuration())
 	mut db := sqlite.connect('database.db') or { panic(err) }
-	db.synchronization_mode(sqlite.SyncMode.off)
-	db.journal_mode(sqlite.JournalMode.memory)
+	db.synchronization_mode(sqlite.SyncMode.off)!
+	db.journal_mode(sqlite.JournalMode.memory)!
 
     app.di.inject_on(&db)
 
@@ -106,6 +105,10 @@ fn main() {
 
 	app.mount[DemoController]()
 	app.statics('/', 'statics', 'index.html')
+
+    // mut asset := very.Asset{}
+    // app.embed_statics('/dist', asset) // see examples/bind_bin_data.vsh
+
 	app.run()
 }
 ```
