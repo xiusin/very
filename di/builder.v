@@ -1,17 +1,13 @@
 module di
 
-pub interface AbstractBuilder {
-	set(Service)
-	exists(string) bool
-	get_voidptr(string) !voidptr
-}
+import v.reflection
 
 const default_builder = new_builder() // like var, if not allow, we can use `__global`
 
 [head]
 pub struct Builder {
 mut:
-	services shared map[string]Service
+	services shared map[string]&Service
 }
 
 pub fn new_builder() &Builder {
@@ -23,9 +19,9 @@ pub fn default_builder() &Builder {
 }
 
 // set The reference type must be set
-pub fn (mut b Builder) set(service Service) {
+pub fn (mut b Builder) set(service &Service) {
 	lock b.services {
-		b.services[service.name] = service
+		b.services[service.name] = unsafe { service }
 	}
 }
 
@@ -44,9 +40,13 @@ pub fn (mut b Builder) exists(name string) bool {
 }
 
 pub fn (mut b Builder) get_voidptr(name string) !voidptr {
+	return b.get_service(name)!.instance
+}
+
+pub fn (mut b Builder) get_service(name string) !&Service {
 	lock b.services {
 		if name in b.services {
-			return b.services[name].instance
+			return unsafe { b.services[name] }
 		}
 		return error('Unable to find service `${name}`, currently available services are: ${b.services.keys()}')
 	}
@@ -71,14 +71,10 @@ pub fn exists(name string) bool {
 	return builder.exists(name)
 }
 
-pub fn set(name string, instance voidptr) {
-	mut builder := default_builder()
-
-	builder.set(Service{
-		name: name
-		instance: instance
-	})
-}
+// pub fn set(name string, service Service) {
+// 	mut builder := default_builder()
+// 	builder.set(service)
+// }
 
 pub fn get_voidptr(name string) !voidptr {
 	mut builder := default_builder()
@@ -90,14 +86,17 @@ pub fn get[T](name string) !&T {
 	return builder.get[T](name)
 }
 
-pub fn inject_on[T](ptr T) {
-	if !T.name.starts_with('&') {
+pub fn inject_on[T](ptr T, names ...string) {
+	if !T.name.starts_with('&') && reflection.type_of(ptr).sym.kind != reflection.VKind.interface_ {
 		panic('argument must be of reference type.')
 	}
 
+	name := if names.len > 0 {
+		names[0]
+	} else {
+		T.name
+	}
+
 	mut builder := default_builder()
-	builder.set(Service{
-		name: T.name
-		instance: ptr
-	})
+	builder.set(new_service(name, ptr, T.name))
 }

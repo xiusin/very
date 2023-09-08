@@ -2,14 +2,19 @@ module main
 
 import xiusin.very
 import xiusin.very.di
+import log
 
 [group: '/app']
 pub struct App {
 	very.Context
 pub mut:
+	logger_ log.Logger [inject: 'logger']
+
 	hello &string [inject: 'string']
 	// no_inject &string [inject: '_string']
-	xbn int [inject: 'string']
+	xbn &string [inject: 'string']
+	//
+	i_int &int [inject: 'int']
 }
 
 ['/index'; get]
@@ -19,7 +24,13 @@ pub fn (mut app App) app_index() ! {
 
 ['/inject'; get]
 pub fn (mut app App) app_inject() ! {
-	return error('${ptr_str(app.hello)} - ${ptr_str(app.xbn)} - ${app.xbn}')
+	println(app.xbn)
+	println(app.hello)
+	println(app.i_int)
+	unsafe { app.i_int++ }
+	app.logger.debug('xxx')
+	app.logger_.debug('xxx')
+	// return error('${ptr_str(app.hello)} - ${ptr_str(app.xbn)} - ${ptr_str(app.i_int)} - ${app.i_int}')
 }
 
 ['/app_html'; get]
@@ -37,8 +48,9 @@ fn main() {
 	mut app := very.new(very.default_configuration())
 	a := 'hello world'
 	i := 100
-	di.set('string', &a)
-	di.set('int', &i)
+	di.inject_on(&a, 'string')
+	di.inject_on(&i, 'int')
+
 	app.mount[App]()
 	app.run()
 }

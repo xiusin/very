@@ -58,8 +58,14 @@ pub fn (mut ctx Context) reset(req &Request, resp &http.Response) {
 	ctx.mws.clear()
 }
 
-pub fn (mut ctx Context) value(key string) !Val {
-	return ctx.values[key]!
+pub fn (mut ctx Context) value(key string, default_value ...Val) !Val {
+	return ctx.values[key] or {
+		if default_value.len > 0 {
+			default_value[0]
+		} else {
+			return error('Context.value(${key}) not exist')
+		}
+	}
 }
 
 fn (ctx &Context) str() string {

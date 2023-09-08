@@ -93,7 +93,7 @@ pub fn new(cfg Configuration) &Application {
 [inline]
 pub fn (mut app Application) use_logger(logger log.Logger) {
 	app.logger = logger
-	di.set('logger', app.logger)
+	di.inject_on(app.logger, 'logger')
 }
 
 [inline]
@@ -258,7 +258,23 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	$for field in T.fields {
 		services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 		if services.len == 1 {
-			injected_fields[field.name] = app.di.get_voidptr(services[0]) or { panic(err) }
+			sym := reflection.get_type_symbol(field.typ) or {
+				reflection.TypeSymbol{
+					kind: .placeholder
+				}
+			}
+			is_interface := sym.kind == reflection.VKind.interface_
+			if field.indirections == 1 || is_interface {
+				service := app.di.get_service(services[0]) or { panic(err) }
+				field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
+				if service.get_type() == field_typ {
+					injected_fields[field.name] = service.get_instance()
+				} else {
+					panic('service `${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
+				}
+			} else {
+				println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
+			}
 		}
 	}
 	return injected_fields
@@ -338,7 +354,11 @@ pub fn (mut app GroupRouter) mount[T]() {
 							$for field in T.fields {
 								$if field.typ !is Context {
 									if field.name in injected_fields {
-										ctrl.$(field.name) = unsafe { injected_fields[field.name] }
+										unsafe {
+											field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
+											*field_ptr = injected_fields[field.name]
+											_ = field_ptr // shield warning
+										}
 									}
 								}
 							}
