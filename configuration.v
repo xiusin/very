@@ -3,7 +3,7 @@ module very
 import time
 import log
 
-[heap; params]
+[params]
 pub struct Configuration {
 mut:
 	port                       int           = 8080
@@ -27,8 +27,8 @@ mut:
 }
 
 [inline]
-pub fn default_configuration() &Configuration {
-	return &Configuration{}
+pub fn default_configuration() Configuration {
+	return Configuration{}
 }
 
 [inline]
