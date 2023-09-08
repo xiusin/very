@@ -75,10 +75,7 @@ fn main() {
 	db.synchronization_mode(sqlite.SyncMode.off)
 	db.journal_mode(sqlite.JournalMode.memory)
 
-    app.di.set(di.Service{
-		name: 'db'
-		instance: &db
-	})
+    app.di.inject_on(&db)
 
 	sql db {
 		create table Article

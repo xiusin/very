@@ -207,7 +207,6 @@ fn (mut app GroupRouter) register_file(dir string, prefix string, index_file str
 		return app.file_handler(dir, index_file)
 	}
 
-	// 待优化
 	files := os.ls(dir) or { return }
 	app.all('${prefix}/*filepath', cfn(dir, index_file))
 	for file in files {
@@ -241,7 +240,6 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 	return group_route
 }
 
-// mountable
 fn (mut app GroupRouter) mountable[T]() bool {
 	$for field in T.fields {
 		$if field.name == 'Context'
@@ -253,27 +251,30 @@ fn (mut app GroupRouter) mountable[T]() bool {
 }
 
 fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
-	mut di_flag := 'inject: '
+	di_flag := 'inject: '
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
-		services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
-		if services.len == 1 {
-			sym := reflection.get_type_symbol(field.typ) or {
-				reflection.TypeSymbol{
-					kind: .placeholder
+		$if field.typ !is Context {
+			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
+			if services.len == 1 {
+				sym := reflection.get_type_symbol(field.typ) or {
+					reflection.TypeSymbol{
+						kind: .placeholder
+					}
 				}
-			}
-			is_interface := sym.kind == reflection.VKind.interface_
-			if field.indirections == 1 || is_interface {
-				service := app.di.get_service(services[0]) or { panic(err) }
-				field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
-				if service.get_type() == field_typ {
-					injected_fields[field.name] = service.get_instance()
+				is_interface := sym.kind == reflection.VKind.interface_
+
+				if field.indirections == 1 || is_interface { // only pointer or interface
+					service := app.di.get_service(services[0]) or { panic(err) }
+					field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
+					if service.get_type() == field_typ {
+						injected_fields[field.name] = service.get_instance()
+					} else {
+						panic('`${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
+					}
 				} else {
-					panic('service `${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
+					println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
 				}
-			} else {
-				println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
 			}
 		}
 	}
@@ -401,8 +402,9 @@ fn (mut app Application) handle(req Request) Response {
 
 	req_ctx.reset(very_req, resp)
 	req_ctx.app = app
-	req_ctx.logger = unsafe { app.logger }
-
+	unsafe {
+		req_ctx.logger = app.logger
+	}
 	if app.cfg.disable_keep_alive {
 		resp.header.set(.connection, 'close')
 	}
