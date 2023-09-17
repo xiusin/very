@@ -199,7 +199,6 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 		if ext in vweb.mime_types {
 			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 		}
-		ctx.resp.header.set(.content_encoding, 'gzip')
 		ctx.bytes(data.data)
 	}
 }
@@ -232,8 +231,7 @@ pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
 		if ext in vweb.mime_types {
 			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 		}
-		ctx.resp.header.set(.content_encoding, 'gzip')
-		ctx.bytes(gzip.compress(data.data)!)
+		ctx.bytes(data.data)
 	})
 }
 
