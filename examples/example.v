@@ -52,7 +52,9 @@ fn main() {
 	di.inject_on(&a, 'string')
 	di.inject_on(&i, 'int')
 
-	app.use(middleware.logger, middleware.cors()) // use middleware
+	app.global_use(middleware.favicon(data: $embed_file('favicon.ico', .zlib).to_bytes()))
+
+	// app.use(middleware.logger, middleware.cors()) // use middleware
 
 	mut asset := byte_file_data()
 	app.embed_statics('/dist', mut asset)

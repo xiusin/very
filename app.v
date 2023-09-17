@@ -8,6 +8,7 @@ import vweb
 import very.di
 import xiusin.vcolor
 import v.reflection
+import compress.gzip
 
 type Handler = fn (mut ctx Context) !
 
@@ -198,7 +199,8 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 		if ext in vweb.mime_types {
 			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 		}
-		ctx.resp.body = data
+		ctx.resp.header.set(.content_encoding, 'gzip')
+		ctx.bytes(data.data)
 	}
 }
 
@@ -230,7 +232,8 @@ pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
 		if ext in vweb.mime_types {
 			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 		}
-		ctx.resp.body = data.data.bytestr()
+		ctx.resp.header.set(.content_encoding, 'gzip')
+		ctx.bytes(gzip.compress(data.data)!)
 	})
 }
 
@@ -426,6 +429,22 @@ fn (mut app Application) handle(req Request) Response {
 		req_ctx.resp.header.set(.server, app.cfg.server_name)
 	}
 
+	// 需要联合其他中间件使用, 考虑compress等中间件需要全局
+	if app.global_mws.len > 0 {
+		for _, handler in app.global_mws {
+			if !req_ctx.is_stopped() {
+				handler(mut req_ctx) or {
+					app.recover_handler(mut req_ctx, err) or {}
+					return resp
+				}
+			}
+		}
+
+		if req_ctx.is_stopped() {
+			return resp
+		}
+	}
+
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
 	if !ok {
@@ -438,11 +457,7 @@ fn (mut app Application) handle(req Request) Response {
 		}
 		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or {
-			print_backtrace()
-			app.logger.error('handle err: ${err}')
-			app.recover_handler(mut req_ctx, err) or {}
-		}
+		req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
 	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')

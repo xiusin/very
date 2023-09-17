@@ -125,8 +125,8 @@ pub fn (mut ctx Context) text(result string) {
 }
 
 [inline]
-pub fn (mut ctx Context) bytes(result []byte) {
-	ctx.resp.body = result.str()
+pub fn (mut ctx Context) bytes(result []u8) {
+	ctx.resp.body = result.bytestr()
 }
 
 pub fn (mut ctx Context) html(result string) {
