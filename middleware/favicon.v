@@ -21,6 +21,7 @@ pub fn favicon(cfg FaviconConfig) very.Handler {
 
 	return fn [mut conf] (mut ctx very.Context) ! {
 		if ctx.req.path() != conf.url {
+			ctx.next()!
 			return
 		}
 		if conf.data.len == 0 && conf.file.len == 0 {

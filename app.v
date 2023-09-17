@@ -8,7 +8,6 @@ import vweb
 import very.di
 import xiusin.vcolor
 import v.reflection
-import compress.gzip
 
 type Handler = fn (mut ctx Context) !
 
@@ -49,7 +48,6 @@ mut:
 	quit_ch    chan os.Signal
 	interrupts []fn () !
 pub mut:
-	global_mws        []Handler
 	logger            log.Logger
 	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
 	not_found_handler Handler = unsafe { nil }
@@ -100,12 +98,6 @@ pub fn (mut app Application) use_logger(logger log.Logger) {
 [inline]
 pub fn (mut app Application) use_db_pool(mut pool Pool) {
 	app.db_pool = unsafe { &pool }
-}
-
-// global_use 注册全局中间件: 在每个请求都会触发
-[inline]
-pub fn (mut app Application) global_use(mws ...Handler) {
-	app.global_mws << mws
 }
 
 // use 注册中间件: 匹配到路由时才会执行
@@ -199,7 +191,7 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 		if ext in vweb.mime_types {
 			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
 		}
-		ctx.bytes(data.data)
+		ctx.resp.body = data
 	}
 }
 
@@ -427,36 +419,22 @@ fn (mut app Application) handle(req Request) Response {
 		req_ctx.resp.header.set(.server, app.cfg.server_name)
 	}
 
-	// 需要联合其他中间件使用, 考虑compress等中间件需要全局
-	if app.global_mws.len > 0 {
-		for _, handler in app.global_mws {
-			if !req_ctx.is_stopped() {
-				handler(mut req_ctx) or {
-					app.recover_handler(mut req_ctx, err) or {}
-					return resp
-				}
-			}
-		}
-
-		if req_ctx.is_stopped() {
-			return resp
-		}
-	}
+	req_ctx.mws = app.mws
 
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
 	if !ok {
-		app.not_found_handler(mut req_ctx) or { app.recover_handler(mut req_ctx, err) or {} }
+		req_ctx.handler = app.not_found_handler
 	} else {
 		req_ctx.handler = node.handler_fn()
 
 		if app.cfg.pre_parse_multipart_form {
 			very_req.parse_form() or { panic(err) }
 		}
-		req_ctx.mws = app.mws
 		req_ctx.mws << node.mws
-		req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
 	}
+
+	req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return resp
