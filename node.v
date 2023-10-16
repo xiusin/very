@@ -69,5 +69,9 @@ pub fn (t Node) handler_fn() Handler {
 }
 
 pub fn (t Node) str() string {
-	return 'path:${t.path} pattern: ${t.is_pattern} is_term: ${t.term}'
+	return 'Node{
+	path:\'${t.path}\',
+	pattern: ${t.is_pattern}, 
+	children: ${t.children}}
+'
 }

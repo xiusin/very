@@ -2,7 +2,6 @@ module main
 
 import xiusin.very
 import xiusin.very.di
-import xiusin.very.middleware
 import log
 
 [group: '/app']
@@ -31,7 +30,6 @@ pub fn (mut app App) app_inject() ! {
 	unsafe { app.i_int++ }
 	app.logger.debug('xxx')
 	app.logger_.debug('xxx')
-	// return error('${ptr_str(app.hello)} - ${ptr_str(app.xbn)} - ${ptr_str(app.i_int)} - ${app.i_int}')
 }
 
 ['/app_html'; get]
@@ -42,7 +40,12 @@ pub fn (mut app App) app_html() ! {
 
 ['/none'; get]
 pub fn (mut app App) app_none() {
-	app.text('hello world!')
+	app.text('<h1>Hello, World! _ none</h1>')
+}
+
+['/'; get]
+pub fn (mut app App) index() {
+	app.html('<h1>Hello, World!</h1>')
 }
 
 fn main() {
@@ -52,15 +55,21 @@ fn main() {
 	di.inject_on(&a, 'string')
 	di.inject_on(&i, 'int')
 
-	app.use(middleware.compress, middleware.favicon(
-		data: $embed_file('favicon.ico', .zlib).to_bytes()
-	))
+	// app.use(middleware.compress, middleware.favicon(
+	// 	data: $embed_file('favicon.ico', .zlib).to_bytes()
+	// ))
+
+
+	// /hello/ => hello,
+	// /hello/xiusin => hello, xiusin
+	app.get('/hello/*name', fn (mut ctx very.Context) ! {
+		ctx.html('<h1>Hello, ${ctx.param('name')}!</h1>')
+	})
 
 	// app.use(middleware.logger, middleware.cors()) // use middleware
-
 	mut asset := byte_file_data()
 	app.embed_statics('/dist', mut asset)
-
+	app.statics("/", "dist", "index.html")!
 	app.mount[App]() // mount controller
 	app.run()
 }

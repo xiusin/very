@@ -77,10 +77,10 @@ pub fn new(cfg Configuration) &Application {
 			ctx.text('${err}')
 		}
 		not_found_handler: fn (mut ctx Context) ! {
-			ctx.resp = &Response{
-				body: 'the router ${ctx.req.url} not found'
-			}
 			ctx.resp.set_status(.not_found)
+			code := ctx.resp.status_code
+			message := ctx.resp.status_msg
+			ctx.html($tmpl('resources/status.html'))
 		}
 	}
 
@@ -109,12 +109,10 @@ pub fn (mut app GroupRouter) use(mws ...Handler) {
 // get 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
 	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
-	app.options(path, handle, ...mws)
 }
 
 pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
 	app.trier.add('POST;' + app.get_with_prefix(path), handle, mws)
-	app.options(path, handle, ...mws)
 }
 
 [inline]
@@ -122,22 +120,19 @@ pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler
 	app.trier.add('OPTIONS;' + app.get_with_prefix(path), handle, mws)
 }
 
+[inline]
 pub fn (mut app GroupRouter) put(path string, handle Handler, mws ...Handler) {
-	fk := 'PUT;' + app.get_with_prefix(path)
-	app.trier.add(fk, handle, mws)
-	app.options(path, handle, ...mws)
+	app.trier.add('PUT;' + app.get_with_prefix(path), handle, mws)
 }
 
 [inline]
 pub fn (mut app GroupRouter) delete(path string, handle Handler, mws ...Handler) {
 	app.trier.add('DELETE;' + app.get_with_prefix(path), handle, mws)
-	app.options(path, handle, ...mws)
 }
 
 [inline]
 pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
 	app.trier.add('HEAD;' + app.get_with_prefix(path), handle, mws)
-	app.options(path, handle, ...mws)
 }
 
 // add 添加一个路由
@@ -157,15 +152,7 @@ pub fn (mut app GroupRouter) all(path string, handle Handler, mws ...Handler) {
 
 // get_with_prefix 获取带前缀的路由path
 fn (mut app GroupRouter) get_with_prefix(key string) string {
-	if key.starts_with('/') {
-		if key == '/' {
-			return '${app.prefix}*filepath'
-		} else {
-			return '${app.prefix}${key}'
-		}
-	} else {
-		return '${app.prefix}/${key}'
-	}
+		return '${app.prefix}/${key.trim_left('/')}'
 }
 
 // group Get a group router
@@ -195,17 +182,17 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 	}
 }
 
-fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) {
+fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string)! {
 	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
 		return app.file_handler(dir, index_file)
 	}
 
-	files := os.ls(dir) or { return }
+	files := os.ls(dir)!
 	app.all('${prefix}/*filepath', cfn(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
-			app.register_file(f_dir, '${prefix}/${file}', index_file)
+			app.register_file(f_dir, '${prefix}/${file}', index_file)!
 			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
 		}
 	}
@@ -227,9 +214,9 @@ pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
 	})
 }
 
-pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) {
+pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string)! {
 	default_index_file := if index_file.len > 0 { index_file[0] } else { '' }
-	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)
+	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)!
 }
 
 fn (mut app GroupRouter) parse_group_attr[T]() string {
@@ -384,6 +371,8 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 // handle
 fn (mut app Application) handle(req Request) Response {
+	// 压测发现有些时刻请求进不来导致停止解析,=?
+
 	mut url := urllib.parse(req.url) or { return Response{
 		body: '${err}'
 	} }
@@ -423,6 +412,7 @@ fn (mut app Application) handle(req Request) Response {
 
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
+
 	if !ok {
 		req_ctx.handler = app.not_found_handler
 	} else {
@@ -433,7 +423,6 @@ fn (mut app Application) handle(req Request) Response {
 		}
 		req_ctx.mws << node.mws
 	}
-
 	req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')

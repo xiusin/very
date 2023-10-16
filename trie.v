@@ -27,13 +27,12 @@ pub fn (mut t Trier) add(key string, handler Handler, mws []Handler) &Node {
 		t.size++
 		segments := key.split('/')
 		mut node := t.root // 根节点
-		node.term_count++
 
 		for _, segment in segments {
 			if segment in node.children {
 				node = node.children[segment]
 			} else {
-				chr := segment[0..1].str()
+				chr := if segment.len > 0 { segment[0..1].str() } else { '' }
 				mut se := segment
 				is_pattern := match chr {
 					'*', ':' { true }
@@ -53,12 +52,9 @@ pub fn (mut t Trier) add(key string, handler Handler, mws []Handler) &Node {
 						}
 					}
 				}
-
 				node = node.new_child(se, '', nil, false, false)
-
 				node.set_pattern(is_pattern, se, param_name)
 			}
-			node.term_count++
 		}
 
 		return node.new_child(very.nul, key, handler, true, false)
@@ -85,7 +81,7 @@ pub fn (mut t Trier) find(key string) (&Node, map[string]string, bool) {
 	}
 }
 
-// find_node 查找树节点
+// find_node
 fn find_node(node &Node, mut segments []string, mut params map[string]string) &Node {
 	unsafe {
 		if node == nil {
@@ -100,7 +96,7 @@ fn find_node(node &Node, mut segments []string, mut params map[string]string) &N
 	mut children := node.children()
 	mut n := &Node{}
 
-	if segments[0] !in children { // 不在精准配置的路由里
+	if segments[0] !in children {
 		mut flag := false
 		for m, _ in children {
 			if !unsafe { children[m].is_pattern } {

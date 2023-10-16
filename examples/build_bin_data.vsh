@@ -6,6 +6,5 @@ fn main() {
 	mut assets_ := very.Asset{}
 	assets_.scan_dir(input_arg)
 	assets_.gen()!
-
 	execute_or_panic('v -d net_blocking_sockets . -o examples')
 }
