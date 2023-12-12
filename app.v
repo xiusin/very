@@ -337,22 +337,20 @@ pub fn (mut app GroupRouter) mount[T]() {
 						if method__.name == method.name {
 							$for field in T.fields {
 								$if field.typ !is Context {
-									dump(injected_fields);
 									if field.name in injected_fields || '&${field.name}' in injected_fields {
 										service_field_name := if field.name in injected_fields { field.name } else { '&${field.name}' }
 										unsafe {
-											if !service_field_name.starts_with('&') {
-												field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
-												ttt := injected_fields[service_field_name]
-												*field_ptr = &ttt
-												_ = field_ptr
-											} else {
-											println('server insance = ${service_field_name}')
-
-												field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
-												*field_ptr = injected_fields[service_field_name]
-												_ = field_ptr
-											}
+											// dump(injected_fields);
+											// if !service_field_name.starts_with('&') {
+											// 	field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
+											// ttt := injected_fields[service_field_name]
+											// 	*field_ptr = &ttt
+											// 	_ = field_ptr
+											// } else {
+											field_ptr := &voidptr(&ctrl.$(field.name))
+											*field_ptr = injected_fields[service_field_name]
+											_ = field_ptr
+											// }
 										}
 									}
 								}

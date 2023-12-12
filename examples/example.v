@@ -34,12 +34,13 @@ pub fn (mut app App) app_inject() ! {
 		*app.i_int = rand.intn(19999) or { 0 }
 	}
 	app.logger_.set_level(log.Level.debug)
-	app.logger_.info('logger_ xxx')
+	app.logger_.debug('logger_ xxx')
 }
 
 @['/app_html'; get]
 pub fn (mut app App) app_html() ! {
 	message := 'hello app html'
+	app.logger_.debug('logger_ ${message}')
 	app.html($tmpl('example.html'))
 }
 
