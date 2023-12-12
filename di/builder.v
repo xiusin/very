@@ -4,7 +4,7 @@ import v.reflection
 
 const default_builder = new_builder() // like var, if not allow, we can use `__global`
 
-[head]
+@[head]
 pub struct Builder {
 mut:
 	services shared map[string]&Service

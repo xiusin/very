@@ -119,12 +119,12 @@ pub fn (mut ctx Context) json_pretty[T](result T) {
 	ctx.resp.body = json.encode_pretty(result)
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) text(result string) {
 	ctx.resp.body = result
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) bytes(result []u8) {
 	ctx.resp.body = result.bytestr()
 }
@@ -134,47 +134,47 @@ pub fn (mut ctx Context) html(result string) {
 	ctx.resp.body = result
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) redirect(url string) {
 	ctx.resp.header.add(.location, url)
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) writer() &http.Response {
 	return ctx.resp
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) request() &Request {
 	return ctx.req
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) param(key string) string {
 	return ctx.params[key] or { '' }
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) set_param(key string, value string) {
 	ctx.params[key] = value
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) set(key string, value Val) {
 	ctx.values[key] = value
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) set_cookie(cookie http.Cookie) {
 	ctx.resp.header.add(.set_cookie, cookie.str())
 }
 
-[inline]
+@[inline]
 pub fn (mut ctx Context) body_parse[T]() !T {
 	return ctx.req.body_parse[T]()
 }
 
-// [inline]
+// @[inline]
 // pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
 // 	return validator.validate[T](data)
 // }

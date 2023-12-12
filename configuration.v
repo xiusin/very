@@ -3,7 +3,7 @@ module very
 import time
 import log
 
-[params]
+@[params]
 pub struct Configuration {
 mut:
 	port                       int           = 8080
@@ -26,17 +26,17 @@ mut:
 	logger_path                string
 }
 
-[inline]
+@[inline]
 pub fn default_configuration() Configuration {
 	return Configuration{}
 }
 
-[inline]
+@[inline]
 pub fn (mut conf Configuration) get_session_name() string {
 	return conf.session_name
 }
 
-[inline]
+@[inline]
 pub fn (mut conf Configuration) get_port() int {
 	return conf.port
 }

@@ -21,52 +21,52 @@ pub fn new_request(req &http.Request, url urllib.URL) &Request {
 	}
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) get_custom_header(key string) !string {
 	return req.header.get_custom(key)!
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) get_header(key http.CommonHeader) string {
 	return req.header.get(key) or { '' }
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) referer() string {
 	return req.header.get(.referer) or { '' }
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) host() string {
 	return req.url_.host
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) path() string {
 	return req.url_.path
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) query(key string) string {
 	return req.query[key] or { '' }
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) add_query(key string, value string) {
 	req.query[key] = value
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) file(name string) ![]http.FileData {
 	return req.files[name] or { return error('have no upload file ${name}.') }
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) form(name string) string {
 	return req.form[name] or { '' }
 }
 
-[inline]
+@[inline]
 pub fn (mut req Request) parse_form() ! {
 	if req.form.len == 0 {
 		req.form, req.files = req.parse_form_from_request() or { return err }

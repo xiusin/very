@@ -28,18 +28,18 @@ mut:
 	mws    []Handler
 	prefix string
 pub mut:
-	di &di.Builder = unsafe { &di.Builder{} }
+	di &di.Builder = unsafe { di.default_builder() }
 }
 
-fn (mut app GroupRouter) get_di() &di.Builder {
+pub fn (app &GroupRouter) get_di() &di.Builder {
 	return app.di
 }
 
-fn (mut app GroupRouter) set_di(mut builder di.Builder) {
+pub fn (mut app GroupRouter) set_di(mut builder di.Builder) {
 	app.di = unsafe { builder }
 }
 
-[heap]
+@[heap]
 pub struct Application {
 	Server
 	GroupRouter
@@ -51,8 +51,6 @@ pub mut:
 	logger            log.Logger
 	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
 	not_found_handler Handler = unsafe { nil }
-	pool              Pool
-	db_pool           &Pool = unsafe { nil }
 }
 
 // new 获取一个Application实例
@@ -69,9 +67,6 @@ pub fn new(cfg Configuration) &Application {
 		di: di.default_builder()
 		trier: new_trie()
 		logger: unsafe { nil }
-		pool: new_pool(fn () &Context {
-			return new_context()
-		})
 		recover_handler: fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
 			ctx.text('${err}')
@@ -89,19 +84,14 @@ pub fn new(cfg Configuration) &Application {
 	return app
 }
 
-[inline]
+@[inline]
 pub fn (mut app Application) use_logger(logger log.Logger) {
 	app.logger = logger
 	di.inject_on(app.logger, 'logger')
 }
 
-[inline]
-pub fn (mut app Application) use_db_pool(mut pool Pool) {
-	app.db_pool = unsafe { &pool }
-}
-
 // use 注册中间件: 匹配到路由时才会执行
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) use(mws ...Handler) {
 	app.mws << mws
 }
@@ -115,28 +105,28 @@ pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
 	app.trier.add('POST;' + app.get_with_prefix(path), handle, mws)
 }
 
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) options(path string, handle Handler, mws ...Handler) {
 	app.trier.add('OPTIONS;' + app.get_with_prefix(path), handle, mws)
 }
 
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) put(path string, handle Handler, mws ...Handler) {
 	app.trier.add('PUT;' + app.get_with_prefix(path), handle, mws)
 }
 
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) delete(path string, handle Handler, mws ...Handler) {
 	app.trier.add('DELETE;' + app.get_with_prefix(path), handle, mws)
 }
 
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
 	app.trier.add('HEAD;' + app.get_with_prefix(path), handle, mws)
 }
 
 // add 添加一个路由
-[inline]
+@[inline]
 pub fn (mut app GroupRouter) add(method http.Method, path string, handle Handler, mws ...Handler) {
 	app.trier.add(method.str() + ';' + app.get_with_prefix(path), handle, mws)
 }
@@ -152,7 +142,7 @@ pub fn (mut app GroupRouter) all(path string, handle Handler, mws ...Handler) {
 
 // get_with_prefix 获取带前缀的路由path
 fn (mut app GroupRouter) get_with_prefix(key string) string {
-		return '${app.prefix}/${key.trim_left('/')}'
+	return '${app.prefix}/${key.trim_left('/')}'
 }
 
 // group Get a group router
@@ -182,7 +172,7 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 	}
 }
 
-fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string)! {
+fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) ! {
 	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
 		return app.file_handler(dir, index_file)
 	}
@@ -214,7 +204,7 @@ pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
 	})
 }
 
-pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string)! {
+pub fn (mut app GroupRouter) statics(prefix string, dir string, index_file ...string) ! {
 	default_index_file := if index_file.len > 0 { index_file[0] } else { '' }
 	app.register_file(dir, if prefix == '/' { '' } else { prefix }, default_index_file)!
 }
@@ -261,9 +251,9 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 					service := app.di.get_service(services[0]) or { panic(err) }
 					field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
 					if service.get_type() == field_typ {
-						injected_fields[field.name] = service.get_instance()
+						injected_fields['${if is_interface { '' } else { '&' }}${field.name}'] = service.get_instance()
 					} else {
-						panic('`${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
+						panic('`${T.name}.${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
 					}
 				} else {
 					println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
@@ -347,11 +337,22 @@ pub fn (mut app GroupRouter) mount[T]() {
 						if method__.name == method.name {
 							$for field in T.fields {
 								$if field.typ !is Context {
-									if field.name in injected_fields {
+									dump(injected_fields);
+									if field.name in injected_fields || '&${field.name}' in injected_fields {
+										service_field_name := if field.name in injected_fields { field.name } else { '&${field.name}' }
 										unsafe {
-											field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
-											*field_ptr = injected_fields[field.name]
-											_ = field_ptr // shield warning
+											if !service_field_name.starts_with('&') {
+												field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
+												ttt := injected_fields[service_field_name]
+												*field_ptr = &ttt
+												_ = field_ptr
+											} else {
+											println('server insance = ${service_field_name}')
+
+												field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
+												*field_ptr = injected_fields[service_field_name]
+												_ = field_ptr
+											}
 										}
 									}
 								}
@@ -440,7 +441,7 @@ pub fn (mut app Application) graceful_shutdown() ! {
 	}
 }
 
-[inline]
+@[inline]
 pub fn (mut app Application) register_on_interrupt(cbs ...fn () !) {
 	app.interrupts << cbs
 }
