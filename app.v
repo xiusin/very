@@ -8,6 +8,8 @@ import vweb
 import very.di
 import xiusin.vcolor
 import v.reflection
+import dl
+import dl.loader
 
 type Handler = fn (mut ctx Context) !
 
@@ -88,6 +90,13 @@ pub fn new(cfg Configuration) &Application {
 pub fn (mut app Application) use_logger(logger log.Logger) {
 	app.logger = logger
 	di.inject_on(app.logger, 'logger')
+}
+
+pub fn (mut app Application) register_plugin(path string) ! {
+	mut dl_loader := loader.get_or_create_dynamic_lib_loader(paths: [path], key: path) or { return }
+	app.register_on_interrupt(fn [mut dl_loader] () ! {
+		dl_loader.unregister()
+	})
 }
 
 // use 注册中间件: 匹配到路由时才会执行
@@ -251,7 +260,11 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 					service := app.di.get_service(services[0]) or { panic(err) }
 					field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
 					if service.get_type() == field_typ {
-						injected_fields['${if is_interface { '' } else { '&' }}${field.name}'] = service.get_instance()
+						injected_fields['${if is_interface {
+							''
+						} else {
+							'&'
+						}}${field.name}'] = service.get_instance()
 					} else {
 						panic('`${T.name}.${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
 					}
@@ -337,8 +350,13 @@ pub fn (mut app GroupRouter) mount[T]() {
 						if method__.name == method.name {
 							$for field in T.fields {
 								$if field.typ !is Context {
-									if field.name in injected_fields || '&${field.name}' in injected_fields {
-										service_field_name := if field.name in injected_fields { field.name } else { '&${field.name}' }
+									if field.name in injected_fields
+										|| '&${field.name}' in injected_fields {
+										service_field_name := if field.name in injected_fields {
+											field.name
+										} else {
+											'&${field.name}'
+										}
 										unsafe {
 											// dump(injected_fields);
 											// if !service_field_name.starts_with('&') {
