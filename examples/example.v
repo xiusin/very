@@ -30,12 +30,14 @@ pub fn (mut app App) app_inject() ! {
 		*app.xbn = 'modity ${rand.intn(1000)}'
 	}
 	unsafe {
-		*app.i_int = rand.intn(19999) or { 0 }
+		*app.i_int = *app.i_int + 1
+	}   
+	if *app.i_int == 101 {
+		println('set log level')
+		app.logger_.set_level(log.Level.debug)
 	}
-	dump(ptr_str(app.logger_))
-	app.logger_.set_level(log.Level.debug)
-	app.logger_.info('logger_ xxx')
-	app.text("app inject")
+	app.logger_.debug('logger_ xxx ${*app.i_int}')
+	app.text("app inject ${*app.i_int}")
 }
 
 @['/app_html'; get]
