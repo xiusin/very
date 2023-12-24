@@ -1,7 +1,6 @@
 *.log
 bin/
 *.db
-examples/example
-examples/examples
+examples/example*
 /examples/bindata.v
 /examples/dist/*

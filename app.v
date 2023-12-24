@@ -357,18 +357,20 @@ pub fn (mut app GroupRouter) mount[T]() {
 										} else {
 											'&${field.name}'
 										}
-										unsafe {
-											// dump(injected_fields);
-											// if !service_field_name.starts_with('&') {
-											// 	field_ptr := &voidptr(&ctrl.$(field.name)) // to &voidptr
-											// ttt := injected_fields[service_field_name]
-											// 	*field_ptr = &ttt
-											// 	_ = field_ptr
-											// } else {
-											field_ptr := &voidptr(&ctrl.$(field.name))
-											*field_ptr = injected_fields[service_field_name]
+					
+										if !service_field_name.starts_with('&') {
+											mut field_ptr :=unsafe{ &voidptr(&ctrl.$(field.name)) }
+											mut service_ := injected_fields[service_field_name] or { 
+												panic('${service_field_name} not found!')	
+											}
+											unsafe { *field_ptr = &service_ }
 											_ = field_ptr
-											// }
+										} else {
+											unsafe{
+												field_ptr := &voidptr(&ctrl.$(field.name))
+												*field_ptr = injected_fields[service_field_name]
+												_ = field_ptr
+											 }
 										}
 									}
 								}

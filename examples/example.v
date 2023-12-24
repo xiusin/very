@@ -25,22 +25,23 @@ pub fn (mut app App) app_index() ! {
 
 @['/inject'; get]
 pub fn (mut app App) app_inject() ! {
-	dump(app.xbn);
+	println('${app.xbn}')
 	unsafe {
 		*app.xbn = 'modity ${rand.intn(1000)}'
 	}
-	println(app.i_int)
 	unsafe {
 		*app.i_int = rand.intn(19999) or { 0 }
 	}
+	dump(ptr_str(app.logger_))
 	app.logger_.set_level(log.Level.debug)
-	app.logger_.debug('logger_ xxx')
+	app.logger_.info('logger_ xxx')
+	app.text("app inject")
 }
 
 @['/app_html'; get]
 pub fn (mut app App) app_html() ! {
 	message := 'hello app html'
-	app.logger_.debug('logger_ ${message}')
+	// app.logger_.debug('logger_ ${message}')
 	app.html($tmpl('example.html'))
 }
 
