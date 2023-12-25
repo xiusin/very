@@ -14,7 +14,7 @@ pub mut:
 	hello &string @[inject: 'string']
 
 	xbn &string @[inject: 'string']
-	//
+
 	i_int &int @[inject: 'int']
 }
 
@@ -31,19 +31,19 @@ pub fn (mut app App) app_inject() ! {
 	}
 	unsafe {
 		*app.i_int = *app.i_int + 1
-	}   
+	}
 	if *app.i_int == 101 {
 		println('set log level')
 		app.logger_.set_level(log.Level.debug)
 	}
-	app.logger_.debug('logger_ xxx ${*app.i_int}')
-	app.text("app inject ${*app.i_int}")
+	app.logger_.debug('logger_ xxx ${*app.i_int} - ${ptr_str(app.logger_)} - ${ptr_str(app.i_int)}')
+	app.text('app inject ${*app.i_int}')
 }
 
-@['/app_html'; get]
+@['/html'; get]
 pub fn (mut app App) app_html() ! {
 	message := 'hello app html'
-	// app.logger_.debug('logger_ ${message}')
+	app.logger_.debug('logger_ ${message}')
 	app.html($tmpl('example.html'))
 }
 
