@@ -174,6 +174,10 @@ pub fn (mut ctx Context) body_parse[T]() !T {
 	return ctx.req.body_parse[T]()
 }
 
+pub fn (mut ctx Context) di[T](name string) !&T {
+	return ctx.app.di.get[T](name)
+}
+
 // @[inline]
 // pub fn (mut ctx Context) validate[T](data &T) ?[]IError {
 // 	return validator.validate[T](data)

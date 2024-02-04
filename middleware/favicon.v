@@ -3,7 +3,7 @@ module middleware
 import xiusin.very
 import os
 
-[params]
+@[params]
 pub struct FaviconConfig {
 pub mut:
 	url           string = '/favicon.ico'

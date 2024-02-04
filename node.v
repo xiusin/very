@@ -37,7 +37,7 @@ pub fn (mut t Node) new_child(val string, path string, handler Handler, term boo
 
 pub fn (mut t Node) set_pattern(is_pattern bool, segment string, param_name string) {
 	if is_pattern {
-		re := regex.regex_opt(segment) or { panic('注册路由节点${segment}失败: ${err}') }
+		re := regex.regex_opt(segment) or { panic('register route node ${segment} failed: ${err}') }
 		t.param_name = param_name
 		t.is_pattern = is_pattern
 		t.re = &re
@@ -71,7 +71,7 @@ pub fn (t Node) handler_fn() Handler {
 pub fn (t Node) str() string {
 	return 'Node{
 	path:\'${t.path}\',
-	pattern: ${t.is_pattern}, 
+	pattern: ${t.is_pattern},
 	children: ${t.children}}
 '
 }

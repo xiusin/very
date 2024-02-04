@@ -54,7 +54,7 @@ pub fn (mut b Builder) get_service(name string) !&Service {
 }
 
 pub fn (mut b Builder) get[T](name string) !&T {
-	return unsafe { T(b.get_voidptr(name)!) }
+	return unsafe { &T(b.get_voidptr(name)!) }
 }
 
 pub fn (mut b Builder) str() string {
