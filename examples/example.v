@@ -47,11 +47,6 @@ pub fn (mut app App) app_html() ! {
 	app.html($tmpl('example.html'))
 }
 
-@['/none'; get]
-pub fn (mut app App) app_none() {
-	app.text('<h1>Hello, World! _ none</h1>')
-}
-
 @['/'; get]
 pub fn (mut app App) index() {
 	app.html('<h1>Hello, World!</h1>')
@@ -78,6 +73,6 @@ fn main() {
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)
 	// app.statics("/", "dist", "index.html") or {}
-	app.mount[App]() // mount controller
+	app.mount[App]()
 	app.run()
 }

@@ -80,7 +80,6 @@ pub fn new(cfg Configuration) &Application {
 			ctx.html($tmpl('resources/status.html'))
 		}
 	}
-
 	app.use_logger(logger)
 
 	return app
@@ -99,17 +98,17 @@ pub fn (mut app Application) register_plugin(path string) ! {
 	})
 }
 
-// use 注册中间件: 匹配到路由时才会执行
 @[inline]
 pub fn (mut app GroupRouter) use(mws ...Handler) {
 	app.mws << mws
 }
 
-// get 注册get路由
+@[inline]
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
 	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
 }
 
+@[inline]
 pub fn (mut app GroupRouter) post(path string, handle Handler, mws ...Handler) {
 	app.trier.add('POST;' + app.get_with_prefix(path), handle, mws)
 }
@@ -134,7 +133,6 @@ pub fn (mut app GroupRouter) head(path string, handle Handler, mws ...Handler) {
 	app.trier.add('HEAD;' + app.get_with_prefix(path), handle, mws)
 }
 
-// add 添加一个路由
 @[inline]
 pub fn (mut app GroupRouter) add(method http.Method, path string, handle Handler, mws ...Handler) {
 	app.trier.add(method.str() + ';' + app.get_with_prefix(path), handle, mws)
@@ -150,6 +148,7 @@ pub fn (mut app GroupRouter) all(path string, handle Handler, mws ...Handler) {
 }
 
 // get_with_prefix 获取带前缀的路由path
+@[inline]
 fn (mut app GroupRouter) get_with_prefix(key string) string {
 	return '${app.prefix}/${key.trim_left('/')}'
 }
