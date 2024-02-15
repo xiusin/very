@@ -2,6 +2,7 @@ module main
 
 import xiusin.very
 import xiusin.very.di
+import xiusin.very.middleware
 import log
 import rand
 
@@ -43,7 +44,7 @@ pub fn (mut app App) app_inject() ! {
 @['/html'; get]
 pub fn (mut app App) app_html() ! {
 	message := 'hello app html'
-	app.logger_.debug('logger_ ${message}')
+	app.logger_.info('logger_ ${message}')
 	app.html($tmpl('example.html'))
 }
 
@@ -54,14 +55,13 @@ pub fn (mut app App) index() {
 
 fn main() {
 	mut app := very.new(very.default_configuration())
-	a := 'hello world'
-	i := 100
-	di.inject_on(&a, 'string')
-	di.inject_on(&i, 'int')
-
-	// app.use(middleware.compress, middleware.favicon(
-	// 	data: $embed_file('favicon.ico', .zlib).to_bytes()
-	// ))
+	
+	{
+		a := 'hello world'
+		i := 100
+		di.inject_on(&a, 'string')
+		di.inject_on(&i, 'int')
+	}
 
 	// /hello/ => hello,
 	// /hello/xiusin => hello, xiusin
@@ -69,7 +69,9 @@ fn main() {
 		ctx.html('<h1>Hello, ${ctx.param('name')}!</h1>')
 	})
 
-	// app.use(middleware.logger, middleware.cors()) // use middleware
+	app.use(middleware.compress, middleware.logger, middleware.cors(), middleware.favicon(
+		data: $embed_file('favicon.ico', .zlib).to_bytes()
+	)) // use middleware
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)
 	// app.statics("/", "dist", "index.html") or {}

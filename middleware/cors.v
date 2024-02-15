@@ -3,7 +3,7 @@ module middleware
 import xiusin.very
 import time
 
-[params]
+@[params]
 pub struct CorsOption {
 pub mut:
 	allow_origin      string = '*'
