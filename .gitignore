@@ -4,3 +4,4 @@ bin/
 examples/example*
 /examples/bindata.v
 /examples/dist/*
+/examples/build_bin_data
