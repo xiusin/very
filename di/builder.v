@@ -1,11 +1,13 @@
 module di
 
 import v.reflection
+import sync
 
 const default_builder = new_builder() // like var, if not allow, we can use `__global`
 
 @[head]
 pub struct Builder {
+	sync.Mutex
 mut:
 	services shared map[string]&Service
 }
@@ -54,6 +56,11 @@ pub fn (mut b Builder) get_service(name string) !&Service {
 }
 
 pub fn (mut b Builder) get[T](name string) !&T {
+	b.@lock()
+	defer {
+		b.unlock()
+	}
+
 	return unsafe { &T(b.get_voidptr(name)!) }
 }
 

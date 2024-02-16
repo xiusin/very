@@ -1,7 +1,6 @@
 module main
 
 import xiusin.very
-import xiusin.very.di
 import xiusin.very.middleware
 import log
 import rand
@@ -11,11 +10,8 @@ pub struct App {
 	very.Context
 pub mut:
 	logger_ log.Logger @[inject: 'logger']
-
 	hello &string @[inject: 'string']
-
 	xbn &string @[inject: 'string']
-
 	i_int &int @[inject: 'int']
 }
 
@@ -54,13 +50,18 @@ pub fn (mut app App) index() {
 }
 
 fn main() {
-	mut app := very.new(very.default_configuration())
-	
+	mut app := very.new()
+
+	app.register_on_interrupt(fn()! {
+		println('\nweb server closed!')
+	})
+
+
 	{
 		a := 'hello world'
 		i := 100
-		di.inject_on(&a, 'string')
-		di.inject_on(&i, 'int')
+		app.inject_on(&a, 'string')
+		app.inject_on(&i, 'int')
 	}
 
 	// /hello/ => hello,
@@ -69,9 +70,10 @@ fn main() {
 		ctx.html('<h1>Hello, ${ctx.param('name')}!</h1>')
 	})
 
-	app.use(middleware.compress, middleware.logger, middleware.cors(), middleware.favicon(
-		data: $embed_file('favicon.ico', .zlib).to_bytes()
-	)) // use middleware
+// , middleware.favicon(
+// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
+// 	)
+	app.use(middleware.compress, middleware.logger, middleware.cors()) // use middleware
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)
 	// app.statics("/", "dist", "index.html") or {}

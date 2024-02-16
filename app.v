@@ -85,10 +85,18 @@ pub fn new(cfg Configuration) &Application {
 	return app
 }
 
+pub fn (mut app Application) inject_on[T](service T, name ...string) {
+	if name.len > 0 {
+		di.inject_on(service, name[0])
+	} else {
+		di.inject_on(service)
+	}
+}
+
 @[inline]
 pub fn (mut app Application) use_logger(logger log.Logger) {
 	app.logger = logger
-	di.inject_on(app.logger, 'logger')
+	app.inject_on(app.logger, 'logger')
 }
 
 pub fn (mut app Application) register_plugin(path string) ! {
@@ -368,12 +376,12 @@ pub fn (mut app GroupRouter) mount[T]() {
 														_ = field_ptr
 													} $else {
 														mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
-														
-														unsafe { 
+
+														unsafe {
 															mut service_ := injected_fields[service_field_name] or {
 																panic('${service_field_name} not found!')
 															}
-															*field_ptr = &service_ 
+															*field_ptr = &service_
 														}
 														_ = field_ptr
 													}
