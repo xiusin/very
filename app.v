@@ -8,7 +8,6 @@ import vweb
 import very.di
 import xiusin.vcolor
 import v.reflection
-import dl
 import dl.loader
 
 type Handler = fn (mut ctx Context) !
@@ -366,25 +365,27 @@ pub fn (mut app GroupRouter) mount[T]() {
 										}
 
 										if !service_field_name.starts_with('&') {
-													$if macos {
-														mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
+											$if macos {
+												mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
 
-														mut service_ := injected_fields[service_field_name] or {
-															panic('${service_field_name} not found!')
-														}
-														unsafe { *field_ptr = service_ }
-														_ = field_ptr
-													} $else {
-														mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
+												mut service_ := injected_fields[service_field_name] or {
+													panic('${service_field_name} not found!')
+												}
+												unsafe {
+													*field_ptr = service_
+												}
+												_ = field_ptr
+											} $else {
+												mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
 
-														unsafe {
-															mut service_ := injected_fields[service_field_name] or {
-																panic('${service_field_name} not found!')
-															}
-															*field_ptr = &service_
-														}
-														_ = field_ptr
+												unsafe {
+													mut service_ := injected_fields[service_field_name] or {
+														panic('${service_field_name} not found!')
 													}
+													*field_ptr = &service_
+												}
+												_ = field_ptr
+											}
 										} else {
 											unsafe {
 												field_ptr := &voidptr(&ctrl.$(field.name))

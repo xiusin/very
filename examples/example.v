@@ -10,9 +10,9 @@ pub struct App {
 	very.Context
 pub mut:
 	logger_ log.Logger @[inject: 'logger']
-	hello &string @[inject: 'string']
-	xbn &string @[inject: 'string']
-	i_int &int @[inject: 'int']
+	hello   &string    @[inject: 'string']
+	xbn     &string    @[inject: 'string']
+	i_int   &int       @[inject: 'int']
 }
 
 @['/index'; get]
@@ -24,7 +24,7 @@ pub fn (mut app App) app_index() ! {
 pub fn (mut app App) app_inject() ! {
 	println('${app.xbn}')
 	unsafe {
-		*app.xbn = 'modity ${rand.intn(1000)}'
+		*app.xbn = 'modity ${rand.intn(1000) or { 0 }}'
 	}
 	unsafe {
 		*app.i_int = *app.i_int + 1
@@ -52,10 +52,9 @@ pub fn (mut app App) index() {
 fn main() {
 	mut app := very.new()
 
-	app.register_on_interrupt(fn()! {
+	app.register_on_interrupt(fn () ! {
 		println('\nweb server closed!')
 	})
-
 
 	{
 		a := 'hello world'
@@ -63,16 +62,15 @@ fn main() {
 		app.inject_on(&a, 'string')
 		app.inject_on(&i, 'int')
 	}
-
 	// /hello/ => hello,
 	// /hello/xiusin => hello, xiusin
 	app.get('/hello/*name', fn (mut ctx very.Context) ! {
 		ctx.html('<h1>Hello, ${ctx.param('name')}!</h1>')
 	})
 
-// , middleware.favicon(
-// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
-// 	)
+	// , middleware.favicon(
+	// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
+	// 	)
 	app.use(middleware.compress, middleware.logger, middleware.cors()) // use middleware
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)

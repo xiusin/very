@@ -32,11 +32,11 @@ pub fn default_configuration() Configuration {
 }
 
 @[inline]
-pub fn (mut conf Configuration) get_session_name() string {
+pub fn (conf Configuration) get_session_name() string {
 	return conf.session_name
 }
 
 @[inline]
-pub fn (mut conf Configuration) get_port() int {
+pub fn (conf Configuration) get_port() int {
 	return conf.port
 }
