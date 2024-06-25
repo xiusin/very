@@ -8,7 +8,7 @@ mut:
 	factory fn () voidptr = unsafe { nil }
 }
 
-// new_pool  函数创建一个新的池(Pool)对象，使用给定的大小和工厂函数。
+// new_ch_pool 函数创建一个新的池(Pool)对象，使用给定的大小和工厂函数。
 // - size: 池的大小。
 // - factory: 用于填充池的工厂函数。
 // 返回值: &Pool

@@ -56,9 +56,9 @@ pub mut:
 
 // new 获取一个Application实例
 pub fn new(cfg Configuration) &Application {
-	mut logger := &log.Log{
-		level: cfg.logger_level
-	}
+	mut logger := &log.Log{}
+	logger.set_level(cfg.logger_level)
+
 	if cfg.logger_path.len > 0 {
 		logger.set_full_logpath(cfg.logger_path)
 	}

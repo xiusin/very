@@ -5,6 +5,22 @@ import very.session
 import json
 import log
 
+pub struct Context {
+mut:
+	app        &Application
+	mw_index   int = -1
+	is_stopped bool
+	params     map[string]string
+	values     map[string]Val = map[string]Val{}
+pub mut:
+	req     &Request
+	resp    &http.Response
+	mws     []Handler
+	handler Handler = unsafe { nil }
+	sess    session.Session
+	logger  log.Logger
+}
+
 pub type Val = []byte
 	| []f64
 	| []i64
@@ -21,22 +37,6 @@ pub type Val = []byte
 	| u64
 	| u8
 	| voidptr
-
-pub struct Context {
-mut:
-	app        &Application
-	mw_index   int = -1
-	is_stopped bool
-	resp       &http.Response
-	params     map[string]string
-	values     map[string]Val = map[string]Val{}
-pub mut:
-	req     &Request
-	mws     []Handler
-	handler Handler = unsafe { nil }
-	sess    session.Session
-	logger  log.Logger
-}
 
 fn new_context() &Context {
 	return &Context{
