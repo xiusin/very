@@ -3,7 +3,7 @@ module di
 import v.reflection
 import sync
 
-const default_builder = new_builder() // like var, if not allow, we can use `__global`
+const default_builder = new_builder()
 
 @[head]
 pub struct Builder {
