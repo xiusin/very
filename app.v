@@ -14,15 +14,6 @@ type Handler = fn (mut ctx Context) !
 
 const version = 'v0.0.1 dev'
 
-pub interface AbstractController {
-	ctx &Context
-}
-
-pub interface Injectable {
-	get_di() &di.Builder
-	set_di(mut builder di.Builder)
-}
-
 struct GroupRouter {
 mut:
 	trier  &Trier
@@ -162,13 +153,12 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 
 // group Get a group router
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
-	mut group := &GroupRouter{
+	return &GroupRouter{
 		trier: app.trier
 		mws: mws
 		di: app.get_di()
 		prefix: app.get_with_prefix(prefix)
 	}
-	return group
 }
 
 fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx Context) ! {
@@ -326,15 +316,14 @@ fn (mut app GroupRouter) parse_attrs(name string, attrs []string) !([]http.Metho
 
 pub fn (mut app GroupRouter) mount[T]() {
 	if !app.mountable[T]() {
-		panic('Must pass in a structure that implements `AbstractController`')
+		panic(error('Must pass in a structure that implements `very.contracts.Controller`'))
 	}
 
 	injected_fields, route_prefix := app.get_injected_fields[T](), app.parse_group_attr[T]()
 
-	mut router := if route_prefix.len > 0 {
+	mut router := app
+	if route_prefix.len > 0 {
 		app.group(route_prefix)
-	} else {
-		app
 	}
 
 	$for method_ in T.methods {
@@ -369,7 +358,7 @@ pub fn (mut app GroupRouter) mount[T]() {
 												mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
 
 												mut service_ := injected_fields[service_field_name] or {
-													panic('${service_field_name} not found!')
+													panic(error('${service_field_name} not found!'))
 												}
 												unsafe {
 													*field_ptr = service_
@@ -380,7 +369,7 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 												unsafe {
 													mut service_ := injected_fields[service_field_name] or {
-														panic('${service_field_name} not found!')
+														panic(error('${service_field_name} not found!'))
 													}
 													*field_ptr = &service_
 												}

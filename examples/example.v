@@ -22,18 +22,15 @@ pub fn (mut app App) app_index() ! {
 
 @['/inject'; get]
 pub fn (mut app App) app_inject() ! {
-	println('${app.xbn}')
 	unsafe {
 		*app.xbn = 'modity ${rand.intn(1000) or { 0 }}'
 	}
 	unsafe {
 		*app.i_int = *app.i_int + 1
 	}
-	if *app.i_int == 101 {
-		println('set log level')
-		app.logger_.set_level(log.Level.debug)
-	}
-	app.logger_.debug('logger_ xxx ${*app.i_int} - ${ptr_str(app.logger_)} - ${ptr_str(app.i_int)}')
+	println('${ptr_str(app.logger_)}')
+	app.logger_.set_level(log.Level.debug)
+	app.logger_.info('logger_ xxx ${*app.i_int} - ${ptr_str(app.logger_)} - ${ptr_str(app.i_int)}')
 	app.text('app inject ${*app.i_int}')
 }
 
@@ -71,7 +68,7 @@ fn main() {
 	// , middleware.favicon(
 	// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
 	// 	)
-	app.use(middleware.compress, middleware.logger, middleware.cors()) // use middleware
+	app.use(middleware.compress,  middleware.cors()) // use middleware
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)
 	// app.statics("/", "dist", "index.html") or {}
