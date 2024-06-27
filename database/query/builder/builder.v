@@ -2,9 +2,10 @@ module builder
 
 pub type QueryCallBack = fn (mut b Builder)
 
-pub type WhereParam = Builder | QueryCallBack | string
+pub type WhereParam = QueryCallBack | string // Builder |
 
-pub type Arg = []Arg
+pub type Arg = Builder
+	| []Arg
 	| []i16
 	| []i32
 	| []int
@@ -23,7 +24,7 @@ struct OrderBy {
 	order_type string
 }
 
-struct Builder {
+pub struct Builder {
 mut:
 	table       string
 	limit       i64
@@ -145,8 +146,7 @@ pub fn (b &Builder) when(condition bool, cb QueryCallBack, else_cb ...QueryCallB
 		if condition {
 			cb(mut b)
 		} else if else_cb.len > 0 {
-			cbe := else_cb[0]
-			cbe(mut b)
+			else_cb[0](mut b)
 		}
 		return b
 	}
@@ -169,21 +169,22 @@ pub fn (b &Builder) group_by_raw(raw string) &Builder {
 
 pub fn (b &Builder) pagination(size i64, current ...i64) &Builder {
 	unsafe {
-		mut ins := b
-		ins.limit = size
+		b.limit = size
 		if current.len > 0 {
-			ins.offset = size * (current[0] - 1)
+			b.offset = size * (current[0] - 1)
 		}
 		return b
 	}
 }
 
-// 生成sql
+pub fn (b &Builder) as_arg() Arg {
+	return Arg(b)
+}
+
 pub fn (b &Builder) string() string {
 	return ''
 }
 
-// 转换为sql
 pub fn (b &Builder) to_sql() string {
 	return 'full sql'
 }
