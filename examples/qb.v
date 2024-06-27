@@ -8,6 +8,8 @@ struct Test {
 fn main() {
 	b := builder.new_query_builder()
 
+builder.query().table()
+
 	age := 10
 
 	b.offset(10).limit(100).table('qa').order_by('id', 'asc')
