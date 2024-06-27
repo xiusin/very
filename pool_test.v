@@ -6,7 +6,7 @@ struct Test {
 	name string
 }
 
-fn pool_test() {
+fn test_pool() {
 	mut i := 0
 	mut pool := very.new_ch_pool[&Test](fn [mut i] () &Test {
 		i += 1

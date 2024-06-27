@@ -325,9 +325,9 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 	injected_fields, route_prefix := app.get_injected_fields[T](), app.parse_group_attr[T]()
 
-	mut router := app
+	mut router := unsafe { &app }
 	if route_prefix.len > 0 {
-		app.group(route_prefix)
+		router = app.group(route_prefix)
 	}
 
 	$for method_ in T.methods {
@@ -437,7 +437,6 @@ fn (mut app Application) handle(req Request) Response {
 	unsafe {
 		req_ctx.logger = app.logger
 	}
-	
 	if app.cfg.disable_keep_alive {
 		resp.header.set(.connection, 'close')
 	}
