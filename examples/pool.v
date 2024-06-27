@@ -20,5 +20,7 @@ fn main() {
 
 	obj4 := pool.acquire()
 
-	println('obj1 = ${obj1}, obj4 = ${obj4}')
+	println('obj1 = ${ptr_str(obj1)}, obj4 = ${ptr_str(obj4)}  eq: ${obj1 == obj4}')
+	obj5 := pool.acquire()
+	println('obj1 = ${ptr_str(obj1)}, obj5 = ${ptr_str(obj5)}  eq: ${obj1 == obj5}')
 }

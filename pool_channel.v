@@ -22,7 +22,6 @@ pub fn (mut p PoolChannel[T]) len() u32 {
 pub fn (mut p PoolChannel[T]) acquire() T {
 	select {
 		mut inst := <-p.objs {
-			println('acquire a inst -> ${ptr_str(inst)}')
 			return inst
 		}
 		else {}
@@ -30,6 +29,6 @@ pub fn (mut p PoolChannel[T]) acquire() T {
 	return p.factory()
 }
 
-pub fn (mut p PoolChannel[T]) release(inst voidptr) {
-	p.objs.try_push(inst)
+pub fn (mut p PoolChannel[T]) release(inst T) {
+	p.objs.try_push(voidptr(&inst))
 }
