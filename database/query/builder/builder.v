@@ -8,20 +8,7 @@ pub type WhereParam = QueryCallBack | i16 | i32 | i64 | i8 | int | string | u16 
 
 const err_not_found_record = error('not found record')
 
-pub type Arg = Builder
-	| []Arg
-	| []i16
-	| []i32
-	| []int
-	| []string
-	| []u16
-	| []u32
-	| []u64
-	| []u8
-	| bool
-	| int
-	| map[string]Arg
-	| string
+
 
 struct OrderBy {
 	field      string

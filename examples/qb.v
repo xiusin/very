@@ -3,7 +3,8 @@ module main
 import xiusin.very.database.query.builder
 
 fn main() {
-	test_table_name()
+	test_builder()
+	// test_table_name()
 	return
 }
 
@@ -36,6 +37,7 @@ fn test_builder() {
 	b := builder.query().offset(10).limit(100).table('qa').order_by('id', 'asc')
 		.@select('t.name', 't.age', 't.address').add_select('app_t.age')
 		.where('name', '=', 'xiusin')
+		.where('name', 'xiusin')
 		.where('age', [u64(1), 2, 3])
 		.where('age', builder.new_query_builder().@select('id').as_arg())
 		.where(fn [age] (mut b builder.Builder) {

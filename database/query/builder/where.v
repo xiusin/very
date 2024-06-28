@@ -9,8 +9,7 @@ pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
 			string {
 				b.parse_where(param, ...args)
 			}
-			else { // id 查询
-			}
+			else {}
 		}
 		return b
 	}
@@ -28,5 +27,9 @@ fn (b &Builder) parse_where(param string, args ...Arg) {
 			arg = args[1]
 		}
 		else {}
+	}
+
+	unsafe {
+		b.wheres << '${param} ${condition} ${arg}'
 	}
 }
