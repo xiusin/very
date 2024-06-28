@@ -7,3 +7,4 @@ examples/example*
 /examples/build_bin_data
 /.idea/
 /.vscode/
+*.php

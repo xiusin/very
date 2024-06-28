@@ -1,8 +1,12 @@
 module builder
 
+import very.contracts
+
 pub type QueryCallBack = fn (mut b Builder)
 
-pub type WhereParam = QueryCallBack | string // Builder |
+pub type WhereParam = QueryCallBack | i16 | i32 | i64 | i8 | int | string | u16 | u32 | u64 | u8
+
+const err_not_found_record = error('not found record')
 
 pub type Arg = Builder
 	| []Arg
@@ -30,11 +34,13 @@ mut:
 	limit       i64
 	offset      i64
 	distinct    bool
+	unions      Unions
 	orderby     []OrderBy
 	orderby_raw string
 	fields      []string
 	groupby     []string
 	groupby_raw string
+	wheres   []string
 }
 
 pub fn new_query_builder() &Builder {
@@ -48,24 +54,34 @@ pub fn (b &Builder) distinct() &Builder {
 	}
 }
 
-pub fn (b &Builder) model[T]() &Builder {
+pub fn (b &Builder) model(taber contracts.Tabler) &Builder {
 	unsafe {
-		// model := T {}
-
+		b.table = taber.table_name()
 		return b
 	}
 }
 
-pub fn (b &Builder) table(table string) &Builder {
+pub fn (b &Builder) table(table TableName, alias ...string) &Builder {
 	unsafe {
-		b.table = table
+		b.table = table.to_string(...alias)
 		return b
 	}
 }
 
-pub fn (b &Builder) from(table string) &Builder {
+pub fn (b &Builder) from(table TableName, alias ...string) &Builder {
 	unsafe {
-		b.table(table)
+		b.table(table, ...alias)
+		return b
+	}
+}
+
+pub fn (b &Builder) form_many(tables ...TableName) &Builder {
+	unsafe {
+		mut ts := []string{}
+		for table in tables {
+			ts << table.to_string()
+		}
+		b.table = ts.join(',')
 		return b
 	}
 }
@@ -152,21 +168,6 @@ pub fn (b &Builder) when(condition bool, cb QueryCallBack, else_cb ...QueryCallB
 	}
 }
 
-pub fn (b &Builder) group_by(columns ...string) &Builder {
-	unsafe {
-		b.groupby << columns
-		return b
-	}
-}
-
-pub fn (b &Builder) group_by_raw(raw string) &Builder {
-	unsafe {
-		b.groupby = []
-		b.groupby_raw = raw
-		return b
-	}
-}
-
 pub fn (b &Builder) pagination(size i64, current ...i64) &Builder {
 	unsafe {
 		b.limit = size
@@ -175,6 +176,14 @@ pub fn (b &Builder) pagination(size i64, current ...i64) &Builder {
 		}
 		return b
 	}
+}
+
+pub fn query() &Builder {
+	return new_query_builder()
+}
+
+pub fn table(table TableName, alias ...string) &Builder {
+	return new_query_builder().table(table, ...alias)
 }
 
 pub fn (b &Builder) as_arg() Arg {
