@@ -22,7 +22,7 @@ fn (u Unions) string() string {
 			result = '${result} ${typ} (${builder.to_sql()})'
 		}
 	}
-	return result
+	return result.trim_left(' ')
 }
 
 pub fn (b &Builder) @union(union_builder &Builder) &Builder {

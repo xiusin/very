@@ -37,10 +37,10 @@ mut:
 	unions      Unions
 	orderby     []OrderBy
 	orderby_raw string
-	fields      []string
+	fields      []string = ['*']
 	groupby     []string
 	groupby_raw string
-	wheres   []string
+	wheres      []string
 }
 
 pub fn new_query_builder() &Builder {
