@@ -6,6 +6,19 @@ pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
 			QueryCallBack {
 				param(mut b)
 			}
+			map[string]Arg {
+				for field, arg in param {
+					b.parse_where(field, arg)
+				}
+			}
+			[]Arg {
+				match param.len {
+					1 { b.where(param[0]) }
+					2 { b.where(param[0], param[1]) }
+					3 { b.where(param[0], param[1], param[2]) }
+					else {}
+				}
+			}
 			string {
 				b.parse_where(param, ...args)
 			}

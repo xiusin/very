@@ -4,11 +4,9 @@ import very.contracts
 
 pub type QueryCallBack = fn (mut b Builder)
 
-pub type WhereParam = QueryCallBack | i16 | i32 | i64 | i8 | int | string | u16 | u32 | u64 | u8
+pub type WhereParam = Arg | QueryCallBack | []Arg | map[string]Arg | string
 
 const err_not_found_record = error('not found record')
-
-
 
 struct OrderBy {
 	field      string

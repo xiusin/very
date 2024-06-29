@@ -15,13 +15,17 @@ pub type Arg = Builder
 	| []u64
 	| []u8
 	| bool
-	| f32
-	| f64
 	| int
 	| map[string]Arg
 	| string
-	| u32
-	| u64
+
+fn convert_number_to_string[T](arr []T) string {
+	mut items := []string{}
+	for _, item in arr {
+		items << '${item}'
+	}
+	return items.join(', ')
+}
 
 fn (a Arg) str() string {
 	return match a {
@@ -32,7 +36,7 @@ fn (a Arg) str() string {
 				'0'
 			}
 		}
-		int, u32, u64, f32, f64 {
+		int {
 			a.str()
 		}
 		string {
@@ -52,15 +56,49 @@ fn (a Arg) str() string {
 			}
 			return items.join(', ')
 		}
-		[]i8, []int, []i16, []i32, []i64, []u8, []u16, []u32, []u64, []f32, []f64 {
-			mut items := []string{}
-			for _, item in a {
-				items << '${item}'
-			}
-			return items.join(', ')
+		[]i8 {
+			convert_number_to_string(a)
+		}
+		[]i16 {
+			convert_number_to_string(a)
+		}
+		[]i32 {
+			convert_number_to_string(a)
+		}
+		[]int {
+			convert_number_to_string(a)
+		}
+		[]i64 {
+			convert_number_to_string(a)
+		}
+		[]u8 {
+			convert_number_to_string(a)
+		}
+		[]u16 {
+			convert_number_to_string(a)
+		}
+		[]u32 {
+			convert_number_to_string(a)
+		}
+		[]u64 {
+			convert_number_to_string(a)
+		}
+		[]f32 {
+			convert_number_to_string(a)
+		}
+		[]f64 {
+			convert_number_to_string(a)
+		}
+		Builder {
+			return '子查询'
 		}
 		else {
-			return '${''}'
+			typename := typeof(a)
+			dump(typename)
+			// if typename.starts_with('map') {
+			// 	return json.encode(a)
+			// }
+			return typename
 		}
 	}
 }
