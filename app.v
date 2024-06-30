@@ -39,7 +39,7 @@ mut:
 	cfg        Configuration
 	quit_ch    chan os.Signal
 	interrupts []fn () !
-	ctx_pool   PoolChannel[&Context]
+	// ctx_pool   &PoolChannel[&Context] = unsafe { nil }
 pub mut:
 	logger            log.Logger
 	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
@@ -60,9 +60,9 @@ pub fn new(cfg Configuration) &Application {
 		di: di.default_builder()
 		trier: new_trie()
 		logger: unsafe { nil }
-		ctx_pool: new_ch_pool(fn () &Context {
-			return new_context()
-		})
+		// ctx_pool: new_ch_pool(fn () !&Context {
+		// 	return new_context()
+		// })
 		recover_handler: fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
 			ctx.text('${err}')
@@ -421,10 +421,10 @@ fn (mut app Application) handle(req Request) Response {
 
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := app.ctx_pool.acquire()
-	defer {
-		app.ctx_pool.release(req_ctx)
-	}
+	mut req_ctx := new_context()
+	// defer {
+	// 	app.ctx_pool.release(req_ctx)
+	// }
 
 	mut very_req := new_request(&req, url)
 

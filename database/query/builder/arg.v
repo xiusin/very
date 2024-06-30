@@ -24,7 +24,30 @@ fn convert_number_to_string[T](arr []T) string {
 	for _, item in arr {
 		items << '${item}'
 	}
-	return items.join(', ')
+	return '(${items.join(', ')})'
+}
+
+// 挪到where构建里去
+fn (a Arg) build_where(builder &Builder) {
+	match a {
+		[]Arg {
+			match a.len {
+				1 {
+					builder.where(a[0] as string)
+				}
+				2 {
+					builder.where(a[0] as string, a[1])
+				}
+				3 {
+					builder.where(a[0] as string, a[1] as string, a[2])
+				}
+				else {}
+			}
+		}
+		else {
+			panic(error('query param `${a}` not support!'))
+		}
+	}
 }
 
 fn (a Arg) str() string {
@@ -40,21 +63,25 @@ fn (a Arg) str() string {
 			a.str()
 		}
 		string {
-			a
+			if a.len == 4 && a.to_upper() == 'NULL' {
+				a
+			} else {
+				"'${a as string}'"
+			}
 		}
 		[]string {
 			mut items := []string{}
 			for _, item in a {
 				items << "'${item}'"
 			}
-			return items.join(', ')
+			return '(${items.join(', ')})'
 		}
 		[]Arg {
 			mut items := []string{}
 			for _, arg in a {
 				items << '${arg}'
 			}
-			return items.join(', ')
+			return '(${items.join(', ')})'
 		}
 		[]i8 {
 			convert_number_to_string(a)
@@ -90,15 +117,10 @@ fn (a Arg) str() string {
 			convert_number_to_string(a)
 		}
 		Builder {
-			return '子查询'
+			return '(SELECT id FROM user)'
 		}
 		else {
-			typename := typeof(a)
-			dump(typename)
-			// if typename.starts_with('map') {
-			// 	return json.encode(a)
-			// }
-			return typename
+			return typeof(a)
 		}
 	}
 }

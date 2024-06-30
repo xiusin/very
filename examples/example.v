@@ -46,7 +46,7 @@ pub fn (mut app App) index() {
 	app.html('<h1>Hello, World!</h1>')
 }
 
-fn main() {
+fn main_() {
 	mut app := very.new()
 
 	app.register_on_interrupt(fn () ! {
@@ -68,7 +68,7 @@ fn main() {
 	// , middleware.favicon(
 	// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
 	// 	)
-	app.use(middleware.compress,  middleware.cors()) // use middleware
+	app.use(middleware.compress, middleware.cors()) // use middleware
 	// mut asset := byte_file_data()
 	// app.embed_statics('/dist', mut asset)
 	// app.statics("/", "dist", "index.html") or {}

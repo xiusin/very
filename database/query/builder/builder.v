@@ -4,7 +4,19 @@ import very.contracts
 
 pub type QueryCallBack = fn (mut b Builder)
 
+pub type Expr = string
+
 pub type WhereParam = Arg | QueryCallBack | []Arg | map[string]Arg | string
+
+pub type Args = []Arg
+
+fn (m Args) to_strings() []string {
+	mut r := []string{}
+	for _, arg in m {
+		r << arg.str()
+	}
+	return r
+}
 
 const err_not_found_record = error('not found record')
 
@@ -26,10 +38,6 @@ mut:
 	groupby     []string
 	groupby_raw string
 	wheres      []string
-}
-
-pub fn new_query_builder() &Builder {
-	return &Builder{}
 }
 
 pub fn (b &Builder) distinct() &Builder {
@@ -114,34 +122,6 @@ pub fn (b &Builder) limit(num i64) &Builder {
 	}
 }
 
-pub fn (b &Builder) order_by(field string, order_type ...string) &Builder {
-	unsafe {
-		b.orderby << OrderBy{
-			field: field
-			order_type: if order_type.len == 0 { order_type[0] } else { 'ASC' }
-		}
-		return b
-	}
-}
-
-pub fn (b &Builder) order_by_desc(field string) &Builder {
-	unsafe {
-		b.orderby << OrderBy{
-			field: field
-			order_type: 'DESC'
-		}
-		return b
-	}
-}
-
-pub fn (b &Builder) order_by_raw(raw string) &Builder {
-	unsafe {
-		b.orderby = []
-		b.orderby_raw = raw
-		return b
-	}
-}
-
 pub fn (b &Builder) when(condition bool, cb QueryCallBack, else_cb ...QueryCallBack) &Builder {
 	unsafe {
 		if condition {
@@ -163,22 +143,10 @@ pub fn (b &Builder) pagination(size i64, current ...i64) &Builder {
 	}
 }
 
-pub fn query() &Builder {
-	return new_query_builder()
-}
-
-pub fn table(table TableName, alias ...string) &Builder {
-	return new_query_builder().table(table, ...alias)
-}
-
 pub fn (b &Builder) as_arg() Arg {
 	return Arg(b)
 }
 
-pub fn (b &Builder) string() string {
-	return ''
-}
-
 pub fn (b &Builder) to_sql() string {
-	return 'full sql'
+	return b.wheres.join(' AND ')
 }
