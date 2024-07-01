@@ -5,7 +5,7 @@ import log
 
 @[params]
 pub struct Configuration {
-mut:
+pub mut:
 	port                       int           = 8080
 	app_name                   string        = 'very'
 	session_name               string        = 'V_SESSION_ID'

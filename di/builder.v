@@ -78,11 +78,6 @@ pub fn exists(name string) bool {
 	return builder.exists(name)
 }
 
-// pub fn set(name string, service Service) {
-// 	mut builder := default_builder()
-// 	builder.set(service)
-// }
-
 pub fn get_voidptr(name string) !voidptr {
 	mut builder := default_builder()
 	return builder.get_voidptr(name)
@@ -95,7 +90,7 @@ pub fn get[T](name string) !&T {
 
 pub fn inject_on[T](ptr T, names ...string) {
 	if !T.name.starts_with('&') && reflection.type_of(ptr).sym.kind != reflection.VKind.interface_ {
-		panic('argument must be of reference type.')
+		panic(error('argument must be of reference type.'))
 	}
 
 	name := if names.len > 0 {

@@ -2,7 +2,6 @@ module builder
 
 import db.mysql
 import json
-import time
 
 pub fn new_query_builder() &Builder {
 	return &Builder{}
