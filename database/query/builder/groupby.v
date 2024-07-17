@@ -1,32 +1,32 @@
 module builder
 
-pub fn (b &Builder) group_by(columns ...string) &Builder {
+pub fn (builder &Builder) group_by(columns ...string) &Builder {
 	unsafe {
-		b.groupby << columns
-		return b
+		builder.groupby << columns
+		return builder
 	}
 }
 
-pub fn (b &Builder) group_by_raw(raw string) &Builder {
+pub fn (builder &Builder) group_by_raw(raw string) &Builder {
 	unsafe {
-		b.groupby = []
-		b.groupby_raw = raw
-		return b
+		builder.groupby = []
+		builder.groupby_raw = raw
+		return builder
 	}
 }
 
-pub fn (b &Builder) having(field string, args ...voidptr) &Builder {
+pub fn (builder &Builder) having(field string, args ...voidptr) &Builder {
 	// switch args.len {
 	// 	case 1:
 	// }
 
-	return unsafe { b }
+	return unsafe { builder }
 }
 
-pub fn (b &Builder) or_having(field string, args ...voidptr) &Builder {
+pub fn (builder &Builder) or_having(field string, args ...voidptr) &Builder {
 	// switch args.len {
 	// 	case 1:
 	// }
 
-	return unsafe { b }
+	return unsafe { builder }
 }

@@ -27,7 +27,6 @@ fn convert_number_to_string[T](arr []T) string {
 	return '(${items.join(', ')})'
 }
 
-// 挪到where构建里去
 fn (a Arg) build_where(builder &Builder) {
 	match a {
 		[]Arg {

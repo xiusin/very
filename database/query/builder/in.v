@@ -1,15 +1,15 @@
 module builder
 
 fn (builder &Builder) where_in(field string, args ...Arg) &Builder {
+	builder.where(field, 'IN', args)
 	unsafe {
-		builder.where(field, 'IN', args)
 		return builder
 	}
 }
 
 fn (builder &Builder) or_where_in(field string, args ...Arg) &Builder {
+	builder.or_where(field, 'IN', args)
 	unsafe {
-		builder.or_where(field, 'IN', args)
 		return builder
 	}
 }
@@ -22,8 +22,8 @@ fn (builder &Builder) where_not_in(field string, args ...Arg) &Builder {
 }
 
 fn (builder &Builder) or_where_not_in(field string, args ...Arg) &Builder {
+	builder.or_where(field, 'NOT IN', args)
 	unsafe {
-		builder.or_where(field, 'NOT IN', args)
 		return builder
 	}
 }

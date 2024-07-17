@@ -1,45 +1,45 @@
 module builder
 
-pub fn (b &Builder) or_where(param WhereParam, args ...Arg) &Builder {
+pub fn (builder &Builder) or_where(param WhereParam, args ...Arg) &Builder {
 	unsafe {
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
+pub fn (builder &Builder) where(param WhereParam, args ...Arg) &Builder {
 	unsafe {
 		match param {
 			QueryCallBack {
-				param(mut b)
+				param(mut builder)
 			}
 			map[string]Arg {
 				for field, arg in param {
-					b.parse_where(field, arg)
+					builder.parse_where(field, arg)
 				}
 			}
 			Arg {
-				param.build_where(b)
+				param.build_where(builder)
 			}
 			[]Arg {
 				for _, arg in param {
-					b.where(arg)
+					builder.where(arg)
 				}
 			}
 			string {
-				b.parse_where(param, ...args)
+				builder.parse_where(param, ...args)
 			}
 		}
-		return b
+		return builder
 	}
 }
 
-fn (b &Builder) where_raw() &Builder {
+fn (builder &Builder) where_raw() &Builder {
 	unsafe {
-		return b
+		return builder
 	}
 }
 
-fn (b &Builder) parse_where(param string, args ...Arg) {
+fn (builder &Builder) parse_where(param string, args ...Arg) {
 	mut condition := '='
 	mut arg := Arg('')
 	match args.len {
@@ -58,6 +58,6 @@ fn (b &Builder) parse_where(param string, args ...Arg) {
 	}
 
 	unsafe {
-		b.wheres << '${param} ${condition} ${arg}'
+		builder.wheres << '${param} ${condition} ${arg}'
 	}
 }

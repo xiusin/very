@@ -1,6 +1,5 @@
 module builder
 
-import db.mysql
 import json
 
 pub fn new_query_builder() &Builder {
@@ -16,50 +15,37 @@ pub fn table(table TableName, alias ...string) &Builder {
 }
 
 pub fn insert(raw string, args ...Arg) !int {
-	mut client := mysql.connect(
-		host: 'manager.xiusin.cn'
-		port: 3306
-		dbname: 'very'
-		username: 'very'
-		password: 'BFdxpC4iwt7NEWiC'
-	)!
-	_ = client.exec_param_many(raw, Args(args).to_strings())!
-	return client.last_id()
-}
-
-fn client_() !mysql.DB {
-	return mysql.connect(
-		host: 'manager.xiusin.cn'
-		port: 3306
-		dbname: 'very'
-		username: 'very'
-		password: 'BFdxpC4iwt7NEWiC'
-	)!
+	return 0
+	// _ = client.exec_param_many(raw, Args(args).to_strings())!
+	// return client.last_id()
 }
 
 pub fn update(raw string, args ...Arg) !u64 {
-	client := client_()!
-	_ = client.exec_param_many(raw, Args(args).to_strings())!
-	client.use_result()
-	return client.affected_rows()
+	return 0
+	// client := client_()!
+	// _ = client.exec_param_many(raw, Args(args).to_strings())!
+	// client.use_result()
+	// return client.affected_rows()
 }
 
 pub fn delete(raw string, args ...Arg) !u64 {
-	client := client_()!
-	_ = client.exec_param_many(raw, Args(args).to_strings())!
-	return client.affected_rows() // TODO 无法获取影响行数
+	return 0
+	// client := client_()!
+	// _ = client.exec_param_many(raw, Args(args).to_strings())!
+	// return client.affected_rows() // TODO 无法获取影响行数
 }
 
 pub fn select_as_maps(raw string, alias ...Arg) ![]map[string]string {
-	mut client := client_()!
-	result := client.real_query(raw)!
-	defer {
-		unsafe {
-			result.free()
-		}
-		client.close()
-	}
-	return result.maps()
+	return []map[string]string{}
+	// mut client := client_()!
+	// result := client.real_query(raw)!
+	// defer {
+	// 	unsafe {
+	// 		result.free()
+	// 	}
+	// 	client.close()
+	// }
+	// return result.maps()
 }
 
 pub fn @select[T](raw string, alias ...Arg) ![]T {

@@ -1,29 +1,29 @@
 module builder
 
-pub fn (b &Builder) order_by(field string, order_type ...string) &Builder {
+pub fn (builder &Builder) order_by(field string, order_type ...string) &Builder {
 	unsafe {
-		b.orderby << OrderBy{
+		builder.orderby << OrderBy{
 			field: field
 			order_type: if order_type.len == 0 { order_type[0] } else { 'ASC' }
 		}
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) order_by_desc(field string) &Builder {
+pub fn (builder &Builder) order_by_desc(field string) &Builder {
 	unsafe {
-		b.orderby << OrderBy{
+		builder.orderby << OrderBy{
 			field: field
 			order_type: 'DESC'
 		}
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) order_by_raw(raw string) &Builder {
+pub fn (builder &Builder) order_by_raw(raw string) &Builder {
 	unsafe {
-		b.orderby = []
-		b.orderby_raw = raw
-		return b
+		builder.orderby = []
+		builder.orderby_raw = raw
+		return builder
 	}
 }

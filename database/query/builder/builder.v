@@ -40,113 +40,146 @@ mut:
 	wheres      []string
 }
 
-pub fn (b &Builder) distinct() &Builder {
+pub fn (builder &Builder) distinct() &Builder {
 	unsafe {
-		b.distinct = true
-		return b
+		builder.distinct = true
+		return builder
 	}
 }
 
-pub fn (b &Builder) model(taber contracts.Tabler) &Builder {
+pub fn (builder &Builder) model(taber contracts.Tabler) &Builder {
 	unsafe {
-		b.table = taber.table_name()
-		return b
+		builder.table = taber.table_name()
+		return builder
 	}
 }
 
-pub fn (b &Builder) table(table TableName, alias ...string) &Builder {
+pub fn (builder &Builder) table(table TableName, alias ...string) &Builder {
 	unsafe {
-		b.table = table.to_string(...alias)
-		return b
+		builder.table = table.to_string(...alias)
+		return builder
 	}
 }
 
-pub fn (b &Builder) from(table TableName, alias ...string) &Builder {
+pub fn (builder &Builder) from(table TableName, alias ...string) &Builder {
 	unsafe {
-		b.table(table, ...alias)
-		return b
+		builder.table(table, ...alias)
+		return builder
 	}
 }
 
-pub fn (b &Builder) form_many(tables ...TableName) &Builder {
+pub fn (builder &Builder) form_many(tables ...TableName) &Builder {
 	unsafe {
 		mut ts := []string{}
 		for table in tables {
 			ts << table.to_string()
 		}
-		b.table = ts.join(',')
-		return b
+		builder.table = ts.join(',')
+		return builder
 	}
 }
 
-pub fn (b &Builder) @select(columns ...string) &Builder {
+pub fn (builder &Builder) @select(columns ...string) &Builder {
 	unsafe {
-		b.fields = []
-		b.add_select(...columns)
-		return b
+		builder.fields = []
+		builder.add_select(...columns)
+		return builder
 	}
 }
 
-pub fn (b &Builder) add_select(columns ...string) &Builder {
+pub fn (builder &Builder) select_sub(cb Builder, as_ string) &Builder {
+	unsafe {
+		builder.fields = []
+		builder.add_select('(${cb.to_sql()}) AS ${as_}')
+		return builder
+	}
+}
+
+pub fn (builder &Builder) add_select(columns ...string) &Builder {
 	unsafe {
 		if columns.len > 0 {
-			b.fields << columns
+			builder.fields << columns
 		}
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) skip(offset i64) &Builder {
+pub fn (builder &Builder) add_select_sub() &Builder {
 	unsafe {
-		return b.offset(offset)
+		builder.fields = []
+		builder.add_select(...columns)
+		return builder
 	}
 }
 
-pub fn (b &Builder) take(num i64) &Builder {
+pub fn (builder &Builder) skip(offset i64) &Builder {
 	unsafe {
-		return b.limit(num)
+		return builder.offset(offset)
 	}
 }
 
-pub fn (b &Builder) offset(offset i64) &Builder {
+pub fn (builder &Builder) take(num i64) &Builder {
 	unsafe {
-		b.offset = offset
-		return b
+		return builder.limit(num)
 	}
 }
 
-pub fn (b &Builder) limit(num i64) &Builder {
+pub fn (builder &Builder) offset(offset i64) &Builder {
 	unsafe {
-		b.limit = num
-		return b
+		builder.offset = offset
+		return builder
 	}
 }
 
-pub fn (b &Builder) when(condition bool, cb QueryCallBack, else_cb ...QueryCallBack) &Builder {
+pub fn (builder &Builder) limit(num i64) &Builder {
+	unsafe {
+		builder.limit = num
+		return builder
+	}
+}
+
+pub fn (builder &Builder) when(condition bool, cb QueryCallBack, else_cb ...QueryCallBack) &Builder {
 	unsafe {
 		if condition {
-			cb(mut b)
+			cb(mut builder)
 		} else if else_cb.len > 0 {
-			else_cb[0](mut b)
+			else_cb[0](mut builder)
 		}
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) pagination(size i64, current ...i64) &Builder {
+pub fn (builder &Builder) pagination(size i64, current ...i64) &Builder {
 	unsafe {
-		b.limit = size
+		builder.limit = size
 		if current.len > 0 {
-			b.offset = size * (current[0] - 1)
+			builder.offset = size * (current[0] - 1)
 		}
-		return b
+		return builder
 	}
 }
 
-pub fn (b &Builder) as_arg() Arg {
-	return Arg(b)
+pub fn (builder &Builder) as_arg() Arg {
+	return Arg(builder)
 }
 
-pub fn (b &Builder) to_sql() string {
-	return b.wheres.join(' AND ')
+fn (builder &Builder) builder_select() string {
+	if builder.distinct {
+		return 'DISTINCT ${builder.fields.join(',')}'
+	}
+	return builder.fields.join(',')
+}
+
+pub fn (builder &Builder) to_sql() string {
+	mut sql_ := 'SELECT ${builder.builder_select()} FROM ${builder.table}'
+
+	if builder.wheres.len > 0 {
+		sql_ += ' WHERE ${builder.wheres.join(' AND ')}'
+	}
+
+	if builder.groupby.len > 0 {
+		sql_ += ' GROUP BY ${builder.groupby.join(',')}'
+	}
+
+	return sql_
 }

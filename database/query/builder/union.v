@@ -25,16 +25,16 @@ fn (u Unions) string() string {
 	return result.trim_left(' ')
 }
 
-pub fn (b &Builder) @union(union_builder &Builder) &Builder {
+pub fn (builder &Builder) @union(union_builder &Builder) &Builder {
 	unsafe {
-		b.unions[UnionType.@union] << union_builder
-		return b
+		builder.unions[UnionType.@union] << union_builder
+		return builder
 	}
 }
 
-pub fn (b &Builder) union_all(union_builder &Builder) &Builder {
+pub fn (builder &Builder) union_all(union_builder &Builder) &Builder {
 	unsafe {
-		b.unions[UnionType.union_all] << union_builder
-		return b
+		builder.unions[UnionType.union_all] << union_builder
+		return builder
 	}
 }
