@@ -22,7 +22,7 @@ pub fn (builder &Builder) order_by_desc(field string) &Builder {
 
 pub fn (builder &Builder) order_by_raw(raw string) &Builder {
 	unsafe {
-		builder.orderby = []
+		builder.orderby = OrderBys{}
 		builder.orderby_raw = raw
 		return builder
 	}

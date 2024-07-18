@@ -25,6 +25,23 @@ struct OrderBy {
 	order_type string
 }
 
+fn (mut o OrderBy) str() string {
+	if o.order_type.len == 0 {
+		return o.field
+	}
+	return '${o.field} ${o.order_type}'
+}
+
+type OrderBys = []OrderBy
+
+fn (mut o OrderBys) str() string {
+	mut items := []string{}
+	for _, item in o {
+		items << '${item}'
+	}
+	return items.join(',')
+}
+
 pub struct Builder {
 mut:
 	table       string
@@ -32,7 +49,7 @@ mut:
 	offset      i64
 	distinct    bool
 	unions      Unions
-	orderby     []OrderBy
+	orderby     OrderBys
 	orderby_raw string
 	fields      []string = ['*']
 	groupby     []string
@@ -63,8 +80,7 @@ pub fn (builder &Builder) table(table TableName, alias ...string) &Builder {
 
 pub fn (builder &Builder) from(table TableName, alias ...string) &Builder {
 	unsafe {
-		builder.table(table, ...alias)
-		return builder
+		return builder.table(table, ...alias)
 	}
 }
 
@@ -82,16 +98,14 @@ pub fn (builder &Builder) form_many(tables ...TableName) &Builder {
 pub fn (builder &Builder) @select(columns ...string) &Builder {
 	unsafe {
 		builder.fields = []
-		builder.add_select(...columns)
-		return builder
+		return builder.add_select(...columns)
 	}
 }
 
 pub fn (builder &Builder) select_sub(cb Builder, as_ string) &Builder {
 	unsafe {
 		builder.fields = []
-		builder.add_select('(${cb.to_sql()}) AS ${as_}')
-		return builder
+		return builder.add_select('(${cb.to_sql()}) AS ${as_}')
 	}
 }
 
@@ -104,11 +118,9 @@ pub fn (builder &Builder) add_select(columns ...string) &Builder {
 	}
 }
 
-pub fn (builder &Builder) add_select_sub() &Builder {
+pub fn (builder &Builder) add_select_sub(cb Builder, as_ string) &Builder {
 	unsafe {
-		builder.fields = []
-		builder.add_select(...columns)
-		return builder
+		return builder.add_select('(${cb.to_sql()}) AS ${as_}')
 	}
 }
 
@@ -177,9 +189,20 @@ pub fn (builder &Builder) to_sql() string {
 		sql_ += ' WHERE ${builder.wheres.join(' AND ')}'
 	}
 
-	if builder.groupby.len > 0 {
-		sql_ += ' GROUP BY ${builder.groupby.join(',')}'
+	sql_ += if builder.groupby.len > 0 {
+		' GROUP BY ${builder.groupby.join(',')}'
+	} else if builder.groupby_raw.len > 0 {
+		' GROUP BY ${builder.groupby_raw}'
+	} else {
+		''
 	}
 
+	sql_ += if builder.orderby.len > 0 {
+		' ORDER BY ${builder.orderby}'
+	} else if builder.orderby_raw.len > 0 {
+		' ORDER BY ${builder.orderby_raw}'
+	} else {
+		''
+	}
 	return sql_
 }

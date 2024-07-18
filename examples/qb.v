@@ -84,6 +84,8 @@ fn test_builder() {
 		.where_is_not_null('age')
 		.where(map_where)
 		.where(arr_where)
+		.add_select_sub(builder.query().offset(10).limit(100).table('qa').order_by('id',
+			'asc'), 'sub')
 		.where('age', builder.new_query_builder().@select('id').as_arg())
 		.order_by_desc('name').group_by('id', 'name').distinct()
 
