@@ -46,7 +46,7 @@ pub fn (mut app App) index() {
 	app.html('<h1>Hello, World!</h1>')
 }
 
-fn main_() {
+fn main() {
 	mut app := very.new()
 
 	app.register_on_interrupt(fn () ! {
