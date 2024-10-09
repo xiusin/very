@@ -12,11 +12,9 @@ mut:
 	data shared map[string]StoreItem
 }
 
-const (
-	store = &SessionStore{
-		data: map[string]StoreItem{}
-	}
-)
+const store = &SessionStore{
+	data: map[string]StoreItem{}
+}
 
 fn init() {
 	spawn fn () {
@@ -49,7 +47,7 @@ fn (mut store SessionStore) set(sess_id string, data map[string]string, second i
 	lock store.data {
 		store.data[sess_id] = StoreItem{
 			expire_time: time.now().add_seconds(second)
-			data: data.clone()
+			data:        data.clone()
 		}
 	}
 }

@@ -8,6 +8,7 @@ import vweb
 import very.di
 import xiusin.vcolor
 import v.reflection
+import v.debug
 import dl.loader
 
 type Handler = fn (mut ctx Context) !
@@ -56,16 +57,18 @@ pub fn new(cfg Configuration) &Application {
 	}
 
 	mut app := &Application{
-		cfg: cfg
-		di: di.default_builder()
-		trier: new_trie()
+		cfg:    cfg
+		di:     di.default_builder()
+		trier:  new_trie()
 		logger: unsafe { nil }
 		// ctx_pool: new_ch_pool(fn () !&Context {
 		// 	return new_context()
 		// })
-		recover_handler: fn (mut ctx Context, err IError) ! {
+		recover_handler:   fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
-			ctx.text('${err}')
+			code := ctx.resp.status_code
+			message := '${err}'
+			ctx.html($tmpl('resources/status.html'))
 		}
 		not_found_handler: fn (mut ctx Context) ! {
 			ctx.resp.set_status(.not_found)
@@ -158,9 +161,9 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 // group Get a group router
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return &GroupRouter{
-		trier: app.trier
-		mws: mws
-		di: app.get_di()
+		trier:  app.trier
+		mws:    mws
+		di:     app.get_di()
 		prefix: app.get_with_prefix(prefix)
 	}
 }
@@ -404,17 +407,19 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 // handle
 fn (mut app Application) handle(req Request) Response {
-	mut url := urllib.parse(req.url) or { return Response{
-		status_code: 500
-		body: '${err}'
-	} }
+	mut url := urllib.parse(req.url) or {
+		return Response{
+			status_code: 500
+			body:        '${err}'
+		}
+	}
 
 	if app.cfg.max_request_body_size > 0 {
 		content_length := req.header.get(.content_length) or { '0' }.u64()
 		if app.cfg.max_request_body_size < content_length {
 			return Response{
 				status_code: 413
-				body: 'request body size too large!'
+				body:        'request body size too large!'
 			}
 		}
 	}
@@ -450,17 +455,34 @@ fn (mut app Application) handle(req Request) Response {
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
 
+	mut has_err := false
 	if !ok {
 		req_ctx.handler = app.not_found_handler
 	} else {
 		req_ctx.handler = node.handler_fn()
 
 		if app.cfg.pre_parse_multipart_form {
-			very_req.parse_form() or { panic(err) }
+			very_req.parse_form() or {
+				has_err = true
+				req_ctx.resp.set_status(.internal_server_error)
+				req_ctx.resp.body = '${err}'
+			}
+		} else {
+			req_ctx.mws << node.mws
 		}
-		req_ctx.mws << node.mws
 	}
-	req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
+
+	if !has_err {
+		req_ctx.next() or {
+			$if debug {
+				debug.dump_callstack()
+			}
+			app.recover_handler(mut req_ctx, err) or {
+				req_ctx.resp.set_status(.internal_server_error)
+				req_ctx.resp.body = '${err}'
+			}
+		}
+	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return resp
@@ -526,7 +548,7 @@ pub fn (mut app Application) run() {
 	/ )( \(  __)(  _ \( \/ )
 	\ \/ / ) _)  )   / )  /
 	 \__/ (____)(__\_)(__/  '.trim_left('\n') +
-			very.version + '\n')
+			version + '\n')
 		print(color.sprint('[' + app.cfg.app_name + '] '))
 	}
 

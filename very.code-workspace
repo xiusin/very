@@ -1,8 +1,30 @@
 {
-	"folders": [
-		{
-			"path": "."
-		}
+    "folders": [
+        {
+            "path": "."
+        }
     ],
-    "settings": {}
+    "extensions": {
+        "recommendations": [
+            "GuodongSun.vscode-git-cruise", // git 历史管理
+            "maciejdems.add-to-gitignore", // 添加到忽略
+            "donjayamanne.githistory", // 文件历史记录
+            "JanBn.git-last-commit-message", // 快速提交
+            "k--kato.intellij-idea-keybindings", // idea 快捷键
+            "Codeium.codeium", // 代码补全
+            "anweber.vscode-httpyac", // http 接口测试
+            "saber2pr.file-git-history", // 文件历史记录
+            "mk12.better-git-line-blame", // git blame
+            "MS-CEINTL.vscode-language-pack-zh-hans", // 中文
+            "streetsidesoftware.code-spell-checker", // 拼写检查
+            "jgclark.vscode-todo-highlight", // 高亮todo
+            "srmeyers.git-prefix", // git 提交前缀
+            "usernamehw.errorlens", // 错误提示
+            "chadalen.vscode-jetbrains-icon-theme",
+            "VOSCA.vscode-v-analyzer",
+        ]
+    },
+    "settings": {
+        "v-analyzer.serverPath": "~/.config/v-analyzer/bin/v-analyzer"
+    }
 }
