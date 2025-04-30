@@ -17,7 +17,7 @@ pub fn new_builder() &Builder {
 }
 
 pub fn default_builder() &Builder {
-	return di.default_builder
+	return default_builder
 }
 
 // set The reference type must be set
@@ -94,7 +94,7 @@ pub fn get[T](name string) !&T {
 }
 
 pub fn inject_on[T](ptr T, names ...string) {
-	if !T.name.starts_with('&') && reflection.type_of(ptr).sym.kind != reflection.VKind.interface_ {
+	if !T.name.starts_with('&') && reflection.type_of(ptr).sym.kind != reflection.VKind.interface {
 		panic('argument must be of reference type.')
 	}
 

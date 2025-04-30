@@ -10,7 +10,7 @@ import xiusin.vcolor
 import v.reflection
 import dl.loader
 
-type Handler = fn (mut ctx Context) !
+pub type Handler = fn (mut ctx Context) !
 
 const version = 'v0.0.1 dev'
 
@@ -56,14 +56,14 @@ pub fn new(cfg Configuration) &Application {
 	}
 
 	mut app := &Application{
-		cfg: cfg
-		di: di.default_builder()
-		trier: new_trie()
-		logger: unsafe { nil }
-		ctx_pool: new_ch_pool(fn () &Context {
+		cfg:               cfg
+		di:                di.default_builder()
+		trier:             new_trie()
+		logger:            unsafe { nil }
+		ctx_pool:          new_ch_pool(fn () &Context {
 			return new_context()
 		})
-		recover_handler: fn (mut ctx Context, err IError) ! {
+		recover_handler:   fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
 			ctx.text('${err}')
 		}
@@ -158,9 +158,9 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 // group Get a group router
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return &GroupRouter{
-		trier: app.trier
-		mws: mws
-		di: app.get_di()
+		trier:  app.trier
+		mws:    mws
+		di:     app.get_di()
 		prefix: app.get_with_prefix(prefix)
 	}
 }
@@ -404,17 +404,19 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 // handle
 fn (mut app Application) handle(req Request) Response {
-	mut url := urllib.parse(req.url) or { return Response{
-		status_code: 500
-		body: '${err}'
-	} }
+	mut url := urllib.parse(req.url) or {
+		return Response{
+			status_code: 500
+			body:        '${err}'
+		}
+	}
 
 	if app.cfg.max_request_body_size > 0 {
 		content_length := req.header.get(.content_length) or { '0' }.u64()
 		if app.cfg.max_request_body_size < content_length {
 			return Response{
 				status_code: 413
-				body: 'request body size too large!'
+				body:        'request body size too large!'
 			}
 		}
 	}
@@ -526,7 +528,7 @@ pub fn (mut app Application) run() {
 	/ )( \(  __)(  _ \( \/ )
 	\ \/ / ) _)  )   / )  /
 	 \__/ (____)(__\_)(__/  '.trim_left('\n') +
-			very.version + '\n')
+			version + '\n')
 		print(color.sprint('[' + app.cfg.app_name + '] '))
 	}
 
