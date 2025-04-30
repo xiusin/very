@@ -254,20 +254,21 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 						kind: .placeholder
 					}
 				}
-				is_interface := sym.kind == reflection.VKind.interface_
+				is_interface := sym.kind == reflection.VKind.interface
 
 				if field.indirections == 1 || is_interface { // only pointer or interface
 					service := app.di.get_service(services[0]) or { panic(err) }
-					field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
-					if service.get_type() == field_typ {
-						injected_fields['${if is_interface {
-							''
-						} else {
-							'&'
-						}}${field.name}'] = service.get_instance()
+					// field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
+					// if service.get_type() == field_typ {
+
+					injected_fields['${if is_interface {
+						''
 					} else {
-						panic('`${T.name}.${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
-					}
+						'&'
+					}}${field.name}'] = service.get_instance()
+					// } else {
+					// 	panic('`${T.name}.${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
+					// }
 				} else {
 					println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
 				}
@@ -342,61 +343,64 @@ pub fn (mut app GroupRouter) mount[T]() {
 
 			method := method_
 			for ano_method in http_methods {
-				router.add(ano_method, route_path, fn [method, injected_fields] [T](mut ctx Context) ! {
-					mut ctrl := T{}
-					ctrl.Context = ctx
-					$for method__ in T.methods {
-						if method__.name == method.name {
-							$for field in T.fields {
-								$if field.typ !is Context {
-									if field.name in injected_fields
-										|| '&${field.name}' in injected_fields {
-										service_field_name := if field.name in injected_fields {
-											field.name
-										} else {
-											'&${field.name}'
-										}
+				router.add(ano_method, route_path, app.warp_handler[T](method, injected_fields))
+			}
+		}
+	}
+}
 
-										if !service_field_name.starts_with('&') {
-											$if macos {
-												mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
-
-												mut service_ := injected_fields[service_field_name] or {
-													panic(error('${service_field_name} not found!'))
-												}
-												unsafe {
-													*field_ptr = service_
-												}
-												_ = field_ptr
-											} $else {
-												mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
-
-												unsafe {
-													mut service_ := injected_fields[service_field_name] or {
-														panic(error('${service_field_name} not found!'))
-													}
-													*field_ptr = &service_
-												}
-												_ = field_ptr
-											}
-										} else {
-											unsafe {
-												field_ptr := &voidptr(&ctrl.$(field.name))
-												*field_ptr = injected_fields[service_field_name]
-												_ = field_ptr
-											}
-										}
-									}
-								}
+fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields map[string]voidptr) Handler {
+	return fn [method, injected_fields] [T](mut ctx Context) ! {
+		mut ctrl := T{}
+		ctrl.Context = ctx
+		$for method__ in T.methods {
+			if method__.name == method.name {
+				$for field in T.fields {
+					$if field.typ !is Context {
+						if field.name in injected_fields || '&${field.name}' in injected_fields {
+							service_field_name := if field.name in injected_fields {
+								field.name
+							} else {
+								'&${field.name}'
 							}
-							$if method__.is_pub && method__.typ is fn () {
-								ctrl.$method() or { return err }
-							} $else {
-								return error('the method `${method.name}` is not available')
+
+							if !service_field_name.starts_with('&') {
+								$if macos {
+									mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
+
+									mut service_ := injected_fields[service_field_name] or {
+										panic(error('${service_field_name} not found!'))
+									}
+									unsafe {
+										*field_ptr = service_
+									}
+									_ = field_ptr
+								} $else {
+									mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
+
+									unsafe {
+										mut service_ := injected_fields[service_field_name] or {
+											panic(error('${service_field_name} not found!'))
+										}
+										*field_ptr = &service_
+									}
+									_ = field_ptr
+								}
+							} else {
+								unsafe {
+									field_ptr := &voidptr(&ctrl.$(field.name))
+									*field_ptr = injected_fields[service_field_name]
+									_ = field_ptr
+								}
 							}
 						}
 					}
-				})
+				}
+				$if method__.is_pub && method__.typ is fn () {
+					ctrl.$method() or { return err }
+				} $else {
+					return error('the method `${method.name}` is not available')
+				}
 			}
 		}
 	}
