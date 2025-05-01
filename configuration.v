@@ -5,7 +5,7 @@ import log
 
 @[params]
 pub struct Configuration {
-mut:
+pub mut:
 	port                       int           = 8080
 	app_name                   string        = 'very'
 	session_name               string        = 'V_SESSION_ID'
@@ -24,6 +24,7 @@ mut:
 	strict_routing             bool
 	logger_level               log.Level = log.Level.debug
 	logger_path                string
+	logger_console 				bool = true
 }
 
 @[inline]

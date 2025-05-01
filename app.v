@@ -55,6 +55,10 @@ pub fn new(cfg Configuration) &Application {
 		logger.set_full_logpath(cfg.logger_path)
 	}
 
+	if cfg.logger_console {
+		logger.log_to_console_too()
+	}
+
 	mut app := &Application{
 		cfg:               cfg
 		di:                di.default_builder()
