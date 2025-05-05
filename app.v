@@ -69,7 +69,7 @@ pub fn new(cfg Configuration) &Application {
 		})
 		recover_handler:   fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
-			ctx.text('${err}')
+			return ctx.text('${err}')
 		}
 		not_found_handler: fn (mut ctx Context) ! {
 			ctx.resp.set_status(.not_found)
@@ -92,9 +92,9 @@ pub fn (mut app Application) inject_on[T](service T, name ...string) {
 }
 
 @[inline]
-pub fn (mut app Application) use_logger(logger log.Logger) {
+pub fn (mut app Application) use_logger(logger &log.Log) {
 	app.logger = logger
-	app.inject_on(app.logger, 'logger')
+	app.inject_on(logger, 'logger')
 }
 
 pub fn (mut app Application) register_plugin(path string) ! {

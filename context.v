@@ -110,7 +110,7 @@ pub fn (mut ctx Context) abort(status_code http.Status, msg ...string) {
 	}
 }
 
-pub fn (mut ctx Context) json[T](result T) {
+pub fn (mut ctx Context) json[T](result T) ! {
 	ctx.resp.header.add(.content_type, 'application/json')
 	ctx.resp.body = json.encode(result)
 }
@@ -121,7 +121,7 @@ pub fn (mut ctx Context) json_pretty[T](result T) {
 }
 
 @[inline]
-pub fn (mut ctx Context) text(result string) {
+pub fn (mut ctx Context) text(result string) ! {
 	ctx.resp.body = result
 }
 
