@@ -105,5 +105,7 @@ pub fn inject_on[T](ptr T, names ...string) {
 	}
 
 	mut builder := default_builder()
-	builder.set(new_service(name, ptr, T.name))
+	unsafe {
+		builder.set(new_service(name, ptr, T.name))
+	}
 }
