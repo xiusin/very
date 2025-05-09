@@ -61,7 +61,9 @@ pub fn (mut b Builder) get[T](name string) !&T {
 		b.unlock()
 	}
 
-	return unsafe { &T(b.get_voidptr(name)!) }
+	unsafe {
+		return &T(b.get_voidptr(name)!)
+	}
 }
 
 pub fn (mut b Builder) str() string {
