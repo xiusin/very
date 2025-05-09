@@ -20,7 +20,9 @@ mut:
 	mws    []Handler
 	prefix string
 pub mut:
-	di &di.Builder = unsafe { di.default_builder() }
+	di                &di.Builder = unsafe { di.default_builder() }
+	deinit_method     fn (voidptr) !     = unsafe { nil } // 调用结束方法 （controller）
+	not_found_handler Handler     = unsafe { nil }
 }
 
 pub fn (app &GroupRouter) get_di() &di.Builder {
@@ -41,9 +43,10 @@ mut:
 	interrupts []fn () !
 	ctx_pool   PoolChannel[&Context]
 pub mut:
-	logger            log.Logger
-	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
-	not_found_handler Handler = unsafe { nil }
+	logger             log.Logger
+	recover_handler    fn (mut ctx Context, err IError) ! = unsafe { nil }
+	miss_inject_method fn (voidptr) !voidptr              = unsafe { nil } // 自动注入方法 (controller)
+	not_found_handler  Handler = unsafe { nil }
 }
 
 // new 获取一个Application实例
@@ -166,6 +169,7 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 		mws:    mws
 		di:     app.get_di()
 		prefix: app.get_with_prefix(prefix)
+		deinit_method: app.deinit_method
 	}
 }
 
@@ -345,16 +349,16 @@ pub fn (mut app GroupRouter) mount[T]() {
 				http_methods << http.Method.options
 			}
 
-			 method := method_
+			method := method_
 			for ano_method in http_methods {
-				router.add(ano_method, route_path, app.warp_handler[T]( method, injected_fields))
+				router.add(ano_method, route_path, app.warp_handler[T](method, injected_fields))
 			}
 		}
 	}
 }
 
-fn (mut app GroupRouter) warp_handler[T]( method FunctionData, injected_fields map[string]voidptr) Handler {
-	return fn [method, injected_fields] [T](mut ctx Context) ! {
+fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields map[string]voidptr) Handler {
+	return fn [method, injected_fields, mut app] [T](mut ctx Context) ! {
 		mut ctrl := T{}
 		ctrl.Context = ctx
 		$for method__ in T.methods {
@@ -402,6 +406,12 @@ fn (mut app GroupRouter) warp_handler[T]( method FunctionData, injected_fields m
 				}
 				$if method__.is_pub && method__.typ is fn () {
 					ctrl.$method() or { return err }
+					if !isnil(app.deinit_method) {
+						println('call deinit')
+						unsafe {
+							app.deinit_method(voidptr(&ctrl)) or {}
+						}
+					}
 				} $else {
 					return error('the method `${method.name}` is not available')
 				}
