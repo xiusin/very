@@ -78,11 +78,6 @@ pub fn exists(name string) bool {
 	return builder.exists(name)
 }
 
-// pub fn set(name string, service Service) {
-// 	mut builder := default_builder()
-// 	builder.set(service)
-// }
-
 pub fn get_voidptr(name string) !voidptr {
 	mut builder := default_builder()
 	return builder.get_voidptr(name)
@@ -105,7 +100,5 @@ pub fn inject_on[T](ptr T, names ...string) {
 	}
 
 	mut builder := default_builder()
-	unsafe {
-		builder.set(new_service(name, ptr, T.name))
-	}
+	builder.set(new_service(name, voidptr(ptr), T.name))
 }
