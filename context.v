@@ -5,6 +5,7 @@ import json
 import net.http
 import very.session
 import very.validator
+import context
 
 pub struct Context {
 mut:
@@ -20,6 +21,7 @@ pub mut:
 	handler Handler = unsafe { nil }
 	sess    session.Session
 	logger  log.Logger
+	ctx    	context.Context = context.background()
 }
 
 pub type Val = []byte
@@ -101,7 +103,7 @@ pub fn (mut ctx Context) set_status(status_code http.Status) {
 	ctx.resp.status_msg = status_code.str()
 }
 
-pub fn (mut ctx Context) abort(status_code http.Status, msg ...string) {
+pub fn (mut ctx Context) abort(status_code http.Status, msg ...string) ! {
 	ctx.set_status(status_code)
 	ctx.stop()
 

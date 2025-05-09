@@ -7,4 +7,4 @@ examples/example*
 /examples/build_bin_data
 /.idea/
 /.vscode/
-*.php
+.DS_Store

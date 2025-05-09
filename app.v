@@ -345,15 +345,15 @@ pub fn (mut app GroupRouter) mount[T]() {
 				http_methods << http.Method.options
 			}
 
-			method := method_
+			 method := method_
 			for ano_method in http_methods {
-				router.add(ano_method, route_path, app.warp_handler[T](method, injected_fields))
+				router.add(ano_method, route_path, app.warp_handler[T]( method, injected_fields))
 			}
 		}
 	}
 }
 
-fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields map[string]voidptr) Handler {
+fn (mut app GroupRouter) warp_handler[T]( method FunctionData, injected_fields map[string]voidptr) Handler {
 	return fn [method, injected_fields] [T](mut ctx Context) ! {
 		mut ctrl := T{}
 		ctrl.Context = ctx
@@ -373,7 +373,7 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 									mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
 
 									mut service_ := injected_fields[service_field_name] or {
-										panic(error('${service_field_name} not found!'))
+										return error('${service_field_name} not found!')
 									}
 									unsafe {
 										*field_ptr = service_
@@ -384,7 +384,7 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 
 									unsafe {
 										mut service_ := injected_fields[service_field_name] or {
-											panic(error('${service_field_name} not found!'))
+											return error('${service_field_name} not found!')
 										}
 										*field_ptr = &service_
 									}
