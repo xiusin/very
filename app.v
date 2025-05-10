@@ -20,9 +20,10 @@ mut:
 	mws    []Handler
 	prefix string
 pub mut:
-	di                &di.Builder = unsafe { di.default_builder() }
-	deinit_method     fn (voidptr) !     = unsafe { nil } // 调用结束方法 （controller）
-	not_found_handler Handler     = unsafe { nil }
+	di                &di.Builder    = unsafe { di.default_builder() }
+	init_method       fn (voidptr) ! = unsafe { nil } // 调用结束方法 （controller）
+	deinit_method     fn (voidptr) ! = unsafe { nil } // 调用结束方法 （controller）
+	not_found_handler Handler        = unsafe { nil }
 }
 
 pub fn (app &GroupRouter) get_di() &di.Builder {
@@ -43,10 +44,9 @@ mut:
 	interrupts []fn () !
 	ctx_pool   PoolChannel[&Context]
 pub mut:
-	logger             log.Logger
-	recover_handler    fn (mut ctx Context, err IError) ! = unsafe { nil }
-	miss_inject_method fn (voidptr) !voidptr              = unsafe { nil } // 自动注入方法 (controller)
-	not_found_handler  Handler = unsafe { nil }
+	logger            log.Logger
+	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
+	not_found_handler Handler = unsafe { nil }
 }
 
 // new 获取一个Application实例
@@ -67,7 +67,7 @@ pub fn new(cfg Configuration) &Application {
 		di:                di.default_builder()
 		trier:             new_trie()
 		logger:            unsafe { nil }
-		ctx_pool:          new_ch_pool(fn () &Context {
+		ctx_pool:          new_ch_pool(fn () !&Context {
 			return new_context()
 		})
 		recover_handler:   fn (mut ctx Context, err IError) ! {
@@ -165,11 +165,12 @@ fn (mut app GroupRouter) get_with_prefix(key string) string {
 // group Get a group router
 pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	return &GroupRouter{
-		trier:  app.trier
-		mws:    mws
-		di:     app.get_di()
-		prefix: app.get_with_prefix(prefix)
+		trier:         app.trier
+		mws:           mws
+		di:            app.get_di()
+		prefix:        app.get_with_prefix(prefix)
 		deinit_method: app.deinit_method
+		init_method:   app.init_method
 	}
 }
 
@@ -405,9 +406,13 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 					}
 				}
 				$if method__.is_pub && method__.typ is fn () {
+					if !isnil(app.init_method) {
+						unsafe {
+							app.init_method(voidptr(&ctrl)) or {}
+						}
+					}
 					ctrl.$method() or { return err }
 					if !isnil(app.deinit_method) {
-						println('call deinit')
 						unsafe {
 							app.deinit_method(voidptr(&ctrl)) or {}
 						}
@@ -441,7 +446,12 @@ fn (mut app Application) handle(req Request) Response {
 
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := app.ctx_pool.acquire()
+	mut req_ctx := app.ctx_pool.acquire() or {
+		return Response{
+			status_code: 419
+			body:        'too many request'
+		}
+	}
 	defer {
 		app.ctx_pool.release(req_ctx)
 	}
@@ -474,13 +484,14 @@ fn (mut app Application) handle(req Request) Response {
 		req_ctx.handler = app.not_found_handler
 	} else {
 		req_ctx.handler = node.handler_fn()
-
 		if app.cfg.pre_parse_multipart_form {
 			very_req.parse_form() or { panic(err) }
 		}
 		req_ctx.mws << node.mws
 	}
-	req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {} }
+	req_ctx.next() or {
+		app.recover_handler(mut req_ctx, err) or { app.logger.error('request failed: ${err}') }
+	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
 	return resp
