@@ -24,7 +24,7 @@ fn convert_number_to_string[T](arr []T) string {
 	for _, item in arr {
 		items << '${item}'
 	}
-	return items.join(', ')
+	return '(${items.join(', ')})'
 }
 
 fn (a Arg) str() string {
@@ -90,7 +90,7 @@ fn (a Arg) str() string {
 			convert_number_to_string(a)
 		}
 		Builder {
-			return '子查询'
+			return '(${a.to_sql()})'
 		}
 		else {
 			typename := typeof(a)

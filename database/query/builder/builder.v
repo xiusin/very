@@ -1,6 +1,6 @@
 module builder
 
-import very.contracts
+import contracts
 
 pub type QueryCallBack = fn (mut b Builder)
 
@@ -15,17 +15,19 @@ struct OrderBy {
 
 pub struct Builder {
 mut:
-	table       string
-	limit       i64
-	offset      i64
-	distinct    bool
-	unions      Unions
-	orderby     []OrderBy
-	orderby_raw string
-	fields      []string = ['*']
-	groupby     []string
-	groupby_raw string
-	wheres      []string
+	table        string
+	limit        i64
+	offset       i64
+	distinct     bool
+	unions       Unions
+	orderby      []OrderBy
+	orderby_raw  string
+	fields       []string = ['*']
+	groupby      []string
+	groupby_raw  string
+	havingby     []string
+	havingby_raw string
+	wheres       []string
 }
 
 pub fn new_query_builder() &Builder {
@@ -117,7 +119,7 @@ pub fn (b &Builder) limit(num i64) &Builder {
 pub fn (b &Builder) order_by(field string, order_type ...string) &Builder {
 	unsafe {
 		b.orderby << OrderBy{
-			field: field
+			field:      field
 			order_type: if order_type.len == 0 { order_type[0] } else { 'ASC' }
 		}
 		return b
@@ -127,7 +129,7 @@ pub fn (b &Builder) order_by(field string, order_type ...string) &Builder {
 pub fn (b &Builder) order_by_desc(field string) &Builder {
 	unsafe {
 		b.orderby << OrderBy{
-			field: field
+			field:      field
 			order_type: 'DESC'
 		}
 		return b
@@ -180,5 +182,39 @@ pub fn (b &Builder) string() string {
 }
 
 pub fn (b &Builder) to_sql() string {
-	return 'full sql'
+	mut query := 'SELECT ${if b.distinct { 'DISTINCT' } else { '' }} ${b.fields.join(',')} FROM ${b.table}'
+
+	if b.wheres.len > 0 {
+		query = '${query} WHERE ${b.wheres.join(' AND ')}'
+	}
+
+	if b.groupby.len > 0 {
+		query = '${query} GROUP BY ${b.groupby.join(',')}'
+	} else if b.groupby_raw.len > 0 {
+		query = '${query} GROUP BY ${b.groupby_raw}'
+	}
+
+	if b.orderby.len > 0 {
+		mut obs := []string{}
+		for o in b.orderby {
+			obs << '${o.field} ${o.order_type.to_upper()}'
+		}
+		query = '${query} ORDER BY ${obs.join(',')}'
+	} else if b.orderby_raw.len > 0 {
+		query = '${query} ORDER BY ${b.orderby_raw}'
+	}
+
+	if b.limit > 0 {
+		query = '${query} LIMIT ${b.limit}'
+	}
+
+	if b.offset > 0 {
+		query = '${query} OFFSET ${b.offset}'
+	}
+
+	if b.unions.len > 0 {
+		query = '(${query}) ${b.unions.string()}'
+	}
+
+	return query
 }

@@ -7,8 +7,12 @@ pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
 				param(mut b)
 			}
 			map[string]Arg {
-				for field, arg in param {
-					b.parse_where(field, arg)
+				if param.len > 0 {
+					mut wheres := []string{}
+					for field, arg in param {
+						wheres << b.parse_where(field, arg)
+					}
+					b.wheres << '(${wheres.join(' AND ')})'
 				}
 			}
 			[]Arg {
@@ -20,7 +24,7 @@ pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
 				}
 			}
 			string {
-				b.parse_where(param, ...args)
+				b.wheres << b.parse_where(param, ...args)
 			}
 			else {}
 		}
@@ -28,21 +32,23 @@ pub fn (b &Builder) where(param WhereParam, args ...Arg) &Builder {
 	}
 }
 
-fn (b &Builder) parse_where(param string, args ...Arg) {
+fn (b &Builder) parse_where(param string, args ...Arg) string {
 	mut condition := '='
 	mut arg := Arg('')
 	match args.len {
 		1 {
-			arg = args[0]
+			arg = '${args[0]}'
 		}
 		2 {
 			condition = args[0] as string
-			arg = args[1]
+			arg = '${args[1]}'
 		}
 		else {}
 	}
 
-	unsafe {
-		b.wheres << '${param} ${condition} ${arg}'
+	if '${arg}'.trim_space().starts_with('(') {
+		condition = 'IN'
 	}
+
+	return '${param} ${condition} ${arg}'
 }

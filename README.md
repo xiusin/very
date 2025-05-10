@@ -1,6 +1,6 @@
-# very #
+# very [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/xiusin/very)
 
-Express inspired web framework written in V with `net.http.server` module.
+Express inspired web framework written in V with `net.http.server` module. 
 
 >  [Experimental]
 
