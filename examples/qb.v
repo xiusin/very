@@ -28,11 +28,10 @@ fn test_builder() {
 	mut map_where := map[string]builder.Arg{}
 	map_where['name'] = 'xiusin'
 	map_where['height'] = 3000
-	//
-	mut arr_where := []builder.Arg{}
-	arr_where << builder.Arg(['name', '=', 'xiusin'])
-	arr_where << builder.Arg(['name', 'xiusin'])
-	arr_where << builder.Arg(['name', '>', 'xiusin'])
+	// mut arr_where := []builder.Arg{}
+	// arr_where << builder.Arg(['name', '=', 'xiusin'])
+	// arr_where << builder.Arg(['name', 'xiusin'])
+	// arr_where << builder.Arg(['name', '>', 'xiusin'])
 
 	ages := [f64(1), 2.1, 3.3]
 	b := builder.query().offset(10).limit(100).table('qa').order_by('id', 'asc')
@@ -41,14 +40,14 @@ fn test_builder() {
 		.where('name', 'xiusin')
 		.where('age', ages)
 		.where(map_where)
-		.where(arr_where)
-		.where('age', builder.new_query_builder().@select('id').as_arg())
+		// .where(arr_where)
+		.where('age', builder.new_query_builder().table('user_role').@select('id').as_arg())
 		.when(age > 10, fn [age] (mut b builder.Builder) {
-			b.where('age  > ?', age)
+			b.where('age', ">", age)
 		}, fn [age] (mut b builder.Builder) {
-			b.where('age <= ?', age)
+			b.where('age', "<=", age)
 		})
-		.order_by_desc('name').group_by('id', 'name').distinct()
+		.order_by_desc('name').group_by('id', 'name').distinct().to_sql()
 
 	dump(b)
 }
