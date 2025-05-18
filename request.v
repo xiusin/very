@@ -75,14 +75,10 @@ pub fn (mut req Request) parse_form() ! {
 
 pub fn (mut req Request) cookie(key string) !string {
 	mut cookie_header := req.get_header(.cookie)
-	cookie_header = ' ' + cookie_header
-	cookie := if cookie_header.contains(';') {
-		cookie_header.find_between(' ${key}=', ';')
-	} else {
-		cookie_header.find_between(' ${key}=', '\r')
-	}
+	cookie_header = ' ' + cookie_header + ';'
+	cookie := cookie_header.find_between(' ${key}=', ';')
 	if cookie != '' {
-		return cookie.trim_space()
+		return cookie.trim_space().trim('\r\n')
 	}
 	return error('cookie not found')
 }

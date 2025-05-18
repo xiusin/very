@@ -7,6 +7,8 @@ pub struct PoolChannel[T] {
 mut:
 	objs    chan T
 	factory fn () !T = unsafe { nil }
+pub mut:
+	test_on_borrow fn (mut it T) ! = unsafe { nil }
 }
 
 pub fn new_ch_pool[T](factory fn () !T, size ...int) &PoolChannel[T] {
@@ -16,7 +18,7 @@ pub fn new_ch_pool[T](factory fn () !T, size ...int) &PoolChannel[T] {
 		runtime.nr_jobs()
 	}
 	return &PoolChannel[T]{
-		objs: chan T{cap: cap}
+		objs:    chan T{cap: cap}
 		factory: factory
 	}
 }
@@ -28,16 +30,17 @@ pub fn (mut p PoolChannel[T]) len() u32 {
 pub fn (mut p PoolChannel[T]) acquire() !T {
 	select {
 		mut inst := <-p.objs {
+			if !isnil(p.test_on_borrow) {
+				// 无法测试通过，丢弃连接重新拿实例
+				p.test_on_borrow(mut inst) or { return p.factory() }
+			}
+
 			return inst
 		}
-		else {
-
-		}
-	}
-	unsafe {
-		return p.factory()
+		else {}
 	}
 
+	return p.factory()
 }
 
 pub fn (mut p PoolChannel[T]) release(inst T) {
