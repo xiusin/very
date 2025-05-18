@@ -17,7 +17,7 @@ const store = &SessionStore{
 }
 
 fn init() {
-	spawn fn () {
+	go fn () {
 		for {
 			lock store.data {
 				for sess_id, item in store.data {
@@ -35,7 +35,7 @@ fn (mut store SessionStore) get(sess_id string) map[string]string {
 	mut data := map[string]string{}
 	lock store.data {
 		item := store.data[sess_id]
-		if item.expire_time <= time.now() {
+		if  item.expire_time <= time.now() {
 			store.data.delete(sess_id)
 		}
 		data = item.data.clone()

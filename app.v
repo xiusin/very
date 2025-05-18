@@ -69,7 +69,7 @@ pub fn new(cfg Configuration) &Application {
 		logger:            unsafe { nil }
 		ctx_pool:          new_ch_pool(fn () !&Context {
 			return new_context()
-		}, 1024)
+		}, int(cfg.max_request))
 		recover_handler:   fn (mut ctx Context, err IError) ! {
 			ctx.set_status(.internal_server_error)
 			return ctx.text('${err}')
