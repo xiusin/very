@@ -9,6 +9,8 @@ import very.di
 import xiusin.vcolor
 import v.reflection
 import dl.loader
+import picoev
+import picohttpparser
 
 pub type Handler = fn (mut ctx Context) !
 
@@ -39,6 +41,7 @@ pub struct Application {
 	Server
 	GroupRouter
 mut:
+	p          &picoev.Picoev = unsafe { nil }
 	cfg        Configuration
 	quit_ch    chan os.Signal
 	interrupts []fn () !
@@ -63,6 +66,15 @@ pub fn new(cfg Configuration) &Application {
 	}
 
 	mut app := &Application{
+		p:                 picoev.new(picoev.Config{
+			port:         0
+			timeout_secs: 0
+			max_headers:  0
+			max_read:     0
+			max_write:    0
+			family:       .unix
+			host:         ''
+		}) or { panic(err) }
 		cfg:               cfg
 		di:                di.default_builder()
 		trier:             new_trie()
@@ -429,7 +441,7 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 fn (mut app Application) handle(req Request) Response {
 	mut url := urllib.parse(req.url) or {
 		return Response{
-			status_code: 500
+			status_code: http.Status.internal_server_error
 			body:        '${err}'
 		}
 	}
@@ -438,7 +450,7 @@ fn (mut app Application) handle(req Request) Response {
 		content_length := req.header.get(.content_length) or { '0' }.u64()
 		if app.cfg.max_request_body_size < content_length {
 			return Response{
-				status_code: 413
+				status_code: http.Status.request_entity_too_large
 				body:        'request body size too large!'
 			}
 		}
@@ -446,12 +458,7 @@ fn (mut app Application) handle(req Request) Response {
 
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := app.ctx_pool.acquire() or {
-		return Response{
-			status_code: 419
-			body:        'too many request'
-		}
-	}
+	mut req_ctx := app.ctx_pool.acquire() or { new_context() }
 	defer {
 		app.ctx_pool.release(req_ctx)
 	}
@@ -485,7 +492,7 @@ fn (mut app Application) handle(req Request) Response {
 	} else {
 		req_ctx.handler = node.handler_fn()
 		if app.cfg.pre_parse_multipart_form {
-			very_req.parse_form() or { panic(err) }
+			very_req.parse_form() or {}
 		}
 		req_ctx.mws << node.mws
 	}
