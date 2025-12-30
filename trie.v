@@ -96,25 +96,25 @@ fn find_node(node &Node, segments []string, mut params map[string]string) &Node 
 			return node
 		}
 	}
-	mut children := node.children()
+	children := node.children() // 不要克隆children map
 	mut n := &Node{}
 
 	if segments[0] !in children {
 		mut flag := false
-		for m, _ in children {
-			if !unsafe { children[m].is_pattern } {
+		for m, child in children { // 直接遍历children，避免重复查找
+			if !unsafe { child.is_pattern } {
 				continue
 			}
-			mut child := children[m] or { continue }
 			// 检查是否可以匹配路由
 			if child.re.matches_string(segments[0]) {
 				// 查找路由内容
 				res := child.re.find_all_str(segments[0])
 				flag = true
 				if child.param_name.len > 0 {
-					params[child.param_name] = ''
 					if res.len > 0 {
 						params[child.param_name] = res[0]
+					} else {
+						params[child.param_name] = '' // 默认空值
 					}
 				}
 				unsafe {
@@ -132,9 +132,12 @@ fn find_node(node &Node, segments []string, mut params map[string]string) &Node 
 		}
 	}
 
-	mut nsegments := []string{}
-	if segments.len > 1 {
-		nsegments = segments[1..]
+	// 优化：直接使用切片而非创建新数组
+	mut nsegments := segments
+	if nsegments.len > 1 {
+		nsegments = nsegments[1..]
+	} else {
+		nsegments = []string{} // 空切片
 	}
 	return find_node(n, nsegments, mut params)
 }

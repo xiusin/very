@@ -92,8 +92,8 @@ pub fn (mut ctx Context) next() ! {
 	if ctx.mw_index == ctx.mws.len {
 		ctx.handle()!
 	} else {
-		mw := ctx.mws[ctx.mw_index]
-		mw(mut ctx)!
+		// 直接调用中间件，避免额外的变量分配
+		ctx.mws[ctx.mw_index](mut ctx)!
 	}
 }
 

@@ -53,7 +53,7 @@ pub fn (t Node) parent() &Node {
 }
 
 pub fn (t Node) children() map[string]&Node {
-	return t.children.clone()
+	return t.children
 }
 
 pub fn (t Node) terminating() bool {

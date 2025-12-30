@@ -101,6 +101,11 @@ pub fn (mut app GroupRouter) use(mws ...Handler) {
 	app.mws << mws
 }
 
+// 添加错误处理中间件支持
+pub fn (mut app Application) use_error_handler(handler fn (mut ctx Context, err IError) !) {
+	app.recover_handler = handler
+}
+
 // get 注册get路由
 pub fn (mut app GroupRouter) get(path string, handle Handler, mws ...Handler) {
 	app.trier.add('GET;' + app.get_with_prefix(path), handle, mws)
@@ -396,7 +401,13 @@ fn (mut app Application) handle(req Request) Response {
 	} }
 	url.host = req.header.get(.host) or { '' }
 
-	mut req_ctx := new_context()
+	// 从对象池获取Context实例，避免重复分配
+	mut req_ctx := app.pool.acquire().(Context)
+	defer { 
+		// 重置Context并放回池中
+		req_ctx.reset(unsafe { nil }, unsafe { nil })
+		app.pool.release(req_ctx)
+	}
 
 	mut very_req := new_request(&req, url)
 	key := req.method.str() + ';' + url.path
@@ -428,7 +439,7 @@ fn (mut app Application) handle(req Request) Response {
 		if app.cfg.pre_parse_multipart_form {
 			very_req.parse_form() or { panic(err) }
 		}
-		req_ctx.mws = app.mws
+		req_ctx.mws = app.global_mws
 		req_ctx.mws << node.mws
 		req_ctx.next() or { app.recover_handler(mut req_ctx, err) or {
 		} }
