@@ -1,0 +1,10 @@
+- [ ] No `eprintln` statements remain in `test_validate` or `test_required_int` functions in `/workspace/validator/validate_test.v`
+- [ ] `test_validate` assertion (`assert errs.len == N`) matches the actual number of errors produced by the validators for the test data
+- [ ] The comment in `test_validate` accurately describes which fields fail and why (no claim that `'go1ogle.123'` fails URL validation if it does not)
+- [ ] `module validator` declaration is preserved at the top of every `.v` file in `/workspace/validator/`
+- [ ] The `IValidator` interface in `/workspace/validator/validate.v` is unchanged (still declares `field`, `message`, `value`, and `validate() !`)
+- [ ] No files outside `/workspace/validator/` are modified
+- [ ] `cd /workspace && v fmt -w validator/` completes without error
+- [ ] `cd /workspace && v build-module validator/` completes without error
+- [ ] `cd /workspace && v test validator/` reports all tests passing (zero failures)
+- [ ] Existing test structs (`Test`, `TestRequired`, `TestNumber`, `TestMinMax`, `TestUnknown`) and their test functions remain present

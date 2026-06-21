@@ -9,7 +9,7 @@ pub mut:
 }
 
 fn (m Max[T]) validate() ! {
-	check_value := m.value.int()
+	check_value := m.value.f64()
 	mut message := m.message
 	if message.len == 0 {
 		message = '${m.field.name} must be no greater than {max}.'
@@ -37,6 +37,8 @@ fn (m Max[T]) validate() ! {
 				block = m.data.$(field.name).u32() > check_value
 			} $else $if field.typ is u64 {
 				block = m.data.$(field.name).u64() > check_value
+			} $else $if field.typ is f64 {
+				block = m.data.$(field.name) > check_value
 			} $else {
 				return error('max no support ${field.name}:${field.typ}')
 			}

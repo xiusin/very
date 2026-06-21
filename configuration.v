@@ -8,6 +8,7 @@ pub struct Configuration {
 pub mut:
 	port                       int           = 8080
 	app_name                   string        = 'very'
+	profile                    string        = 'dev' // dev / test / prod
 	session_name               string        = 'V_SESSION_ID'
 	server_name                string        = 'xiusin/very'
 	accept_timeout             time.Duration = time.second * 60
@@ -26,6 +27,13 @@ pub mut:
 	logger_path                string
 	logger_console             bool = true
 	max_request                u64  = 1024
+	// enable_request_scope controls whether a request-scoped child DI container
+	// is created for each HTTP request. When false, ctx.di[T] only looks up the
+	// root container (lower overhead per request).
+	enable_request_scope bool
+	// max_request_scope_size bounds the number of beans a request-scoped child
+	// container may hold; 0 means unlimited.
+	max_request_scope_size int = 256
 }
 
 @[inline]

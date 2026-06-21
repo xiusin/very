@@ -4,8 +4,11 @@ import net.http { Request, Response, ResponseConfig, Server, new_response }
 import net.urllib
 import log
 import os
-import vweb
-import very.di
+import time
+import veb
+import xiusin.very.di
+import xiusin.very.event
+import xiusin.very.session
 import xiusin.vcolor
 import v.reflection
 import dl.loader
@@ -20,17 +23,17 @@ mut:
 	mws    []Handler
 	prefix string
 pub mut:
-	di                &di.Builder    = unsafe { di.default_builder() }
+	di                &di.Container  = unsafe { di.default_container() }
 	init_method       fn (voidptr) ! = unsafe { nil } // 调用结束方法 （controller）
 	deinit_method     fn (voidptr) ! = unsafe { nil } // 调用结束方法 （controller）
 	not_found_handler Handler        = unsafe { nil }
 }
 
-pub fn (app &GroupRouter) get_di() &di.Builder {
+pub fn (app &GroupRouter) get_di() &di.Container {
 	return app.di
 }
 
-pub fn (mut app GroupRouter) set_di(mut builder di.Builder) {
+pub fn (mut app GroupRouter) set_di(mut builder di.Container) {
 	app.di = unsafe { builder }
 }
 
@@ -45,6 +48,8 @@ mut:
 	ctx_pool   PoolChannel[&Context]
 pub mut:
 	logger            log.Logger
+	event_bus         &event.EventBus                    = unsafe { nil }
+	session_store     &session.MemorySessionStore        = unsafe { nil }
 	recover_handler   fn (mut ctx Context, err IError) ! = unsafe { nil }
 	not_found_handler Handler = unsafe { nil }
 }
@@ -64,10 +69,11 @@ pub fn new(cfg Configuration) &Application {
 
 	mut app := &Application{
 		cfg:               cfg
-		di:                di.default_builder()
+		di:                di.new_container()
+		event_bus:         event.new_event_bus()
 		trier:             new_trie()
 		logger:            unsafe { nil }
-		ctx_pool:          new_ch_pool(fn () !&Context {
+		ctx_pool:          new_ch_pool[&Context](fn () !&Context {
 			return new_context()
 		}, int(cfg.max_request))
 		recover_handler:   fn (mut ctx Context, err IError) ! {
@@ -92,6 +98,41 @@ pub fn (mut app Application) inject_on[T](service T, name ...string) {
 	} else {
 		di.inject_on(service)
 	}
+}
+
+pub fn (mut app Application) register_singleton[T](instance T, name ...string) {
+	app.di.register_singleton(instance, ...name)
+}
+
+pub fn (mut app Application) register_factory[T](factory fn () &T, scope di.BeanScope, name ...string) {
+	app.di.register_factory(factory, scope, ...name)
+}
+
+pub fn (mut app Application) register_lazy[T](factory fn () &T, name ...string) {
+	app.di.register_lazy(factory, ...name)
+}
+
+pub fn (mut app Application) bind_instance[T](instance T, name ...string) {
+	app.di.bind_instance(instance, ...name)
+}
+
+pub fn (mut app Application) on(event_name string, listener event.EventListener) {
+	app.event_bus.on(event_name, listener)
+}
+
+pub fn (mut app Application) emit(e event.Event) ! {
+	app.event_bus.emit(e)!
+}
+
+pub fn (mut app Application) off(event_name string) {
+	app.event_bus.off(event_name)
+}
+
+// set_session_store configures the session store used by request contexts.
+// When set, every request context's session will use this store instead of
+// the global default. Pass a MemorySessionStore or a custom implementation.
+pub fn (mut app Application) set_session_store(store &session.MemorySessionStore) {
+	app.session_store = store
 }
 
 @[inline]
@@ -174,7 +215,7 @@ pub fn (mut app GroupRouter) group(prefix string, mws ...Handler) &GroupRouter {
 	}
 }
 
-fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx Context) ! {
+fn (mut app GroupRouter) file_handler(dir string, index_file string) Handler {
 	return fn [dir, index_file] (mut ctx Context) ! {
 		mut filepath := ctx.param('filepath')
 		if index_file.len > 0 && filepath.len == 0 {
@@ -183,25 +224,21 @@ fn (mut app GroupRouter) file_handler(dir string, index_file string) fn (mut ctx
 		file := os.join_path(dir.trim('/'), filepath)
 		data := os.read_file(file)!
 		ext := os.file_ext(file)
-		if ext in vweb.mime_types {
-			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+		if ext in veb.mime_types {
+			ctx.resp.header.add(.content_type, veb.mime_types[ext])
 		}
 		ctx.resp.body = data
 	}
 }
 
 fn (mut app GroupRouter) register_file(dir string, prefix string, index_file string) ! {
-	cfn := fn [mut app] (dir string, index_file string) fn (mut ctx Context) ! {
-		return app.file_handler(dir, index_file)
-	}
-
 	files := os.ls(dir)!
-	app.all('${prefix}/*filepath', cfn(dir, index_file))
+	app.all('${prefix}/*filepath', app.file_handler(dir, index_file))
 	for file in files {
 		f_dir := os.join_path(dir, file)
 		if os.is_dir(f_dir) {
 			app.register_file(f_dir, '${prefix}/${file}', index_file)!
-			app.all('${prefix}/${file}/*filepath', cfn(f_dir, index_file))
+			app.all('${prefix}/${file}/*filepath', app.file_handler(f_dir, index_file))
 		}
 	}
 }
@@ -215,8 +252,8 @@ pub fn (mut app GroupRouter) embed_statics(prefix string, mut asset Asset) {
 			asset.find(file)!
 		}
 		ext := os.file_ext(file)
-		if ext in vweb.mime_types {
-			ctx.resp.header.add(.content_type, vweb.mime_types[ext])
+		if ext in veb.mime_types {
+			ctx.resp.header.add(.content_type, veb.mime_types[ext])
 		}
 		ctx.bytes(data.data)
 	})
@@ -242,9 +279,11 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 
 fn (mut app GroupRouter) mountable[T]() bool {
 	$for field in T.fields {
-		$if field.name == 'Context'
-			&& reflection.get_type(field.typ).sym.name == 'xiusin.very.Context' {
-			return true
+		$if field.name == 'Context' {
+			t := reflection.get_type(field.typ) or { reflection.Type{} }
+			if t.sym.name == 'xiusin.very.Context' {
+				return true
+			}
 		}
 	}
 	return false
@@ -255,8 +294,7 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 	mut injected_fields := map[string]voidptr{}
 	$for field in T.fields {
 		$if field.typ !is Context {
-			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag,
-				''))
+			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 			if services.len == 1 {
 				sym := reflection.get_type_symbol(field.typ) or {
 					reflection.TypeSymbol{
@@ -267,17 +305,7 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 
 				if field.indirections == 1 || is_interface { // only pointer or interface
 					service := app.di.get_service(services[0]) or { panic(err) }
-					// field_typ := '${if is_interface { '' } else { '&' }}${reflection.type_symbol_name(field.typ)}'
-					// if service.get_type() == field_typ {
-
-					injected_fields['${if is_interface {
-						''
-					} else {
-						'&'
-					}}${field.name}'] = service.get_instance()
-					// } else {
-					// 	panic('`${T.name}.${field.name}` field type mut be `${service.get_type()}` current `${field_typ}`')
-					// }
+					injected_fields[field.name] = service.get_instance()
 				} else {
 					println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
 				}
@@ -366,41 +394,11 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 			if method__.name == method.name {
 				$for field in T.fields {
 					$if field.typ !is Context {
-						if field.name in injected_fields || '&${field.name}' in injected_fields {
-							service_field_name := if field.name in injected_fields {
-								field.name
-							} else {
-								'&${field.name}'
-							}
-
-							if !service_field_name.starts_with('&') {
-								$if macos {
-									mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
-
-									mut service_ := injected_fields[service_field_name] or {
-										return error('${service_field_name} not found!')
-									}
-									unsafe {
-										*field_ptr = service_
-									}
-									_ = field_ptr
-								} $else {
-									mut field_ptr := unsafe { &voidptr(&ctrl.$(field.name)) }
-
-									unsafe {
-										mut service_ := injected_fields[service_field_name] or {
-											return error('${service_field_name} not found!')
-										}
-										*field_ptr = &service_
-									}
-									_ = field_ptr
-								}
-							} else {
-								unsafe {
-									field_ptr := &voidptr(&ctrl.$(field.name))
-									*field_ptr = injected_fields[service_field_name]
-									_ = field_ptr
-								}
+						if field.name in injected_fields {
+							unsafe {
+								field_ptr := &voidptr(&ctrl.$(field.name))
+								*field_ptr = injected_fields[field.name]
+								_ = field_ptr
 							}
 						}
 					}
@@ -477,6 +475,20 @@ fn (mut app Application) handle(req Request) Response {
 
 	req_ctx.mws = app.mws
 
+	if app.cfg.enable_request_scope {
+		req_ctx.di_container = app.di.create_request_container()
+	}
+
+	if app.session_store != unsafe { nil } {
+		req_ctx.sess.set_session_store(app.session_store)
+	}
+
+	start_ticks := time.ticks()
+	app.emit(event.RequestStartEvent{
+		method: req.method.str()
+		path:   url.path
+	}) or {}
+
 	node, mut params, ok := app.trier.find(key)
 	req_ctx.params = params.move()
 
@@ -494,6 +506,12 @@ fn (mut app Application) handle(req Request) Response {
 	}
 
 	req_ctx.resp.header.set(.content_length, '${req_ctx.resp.body.len}')
+	app.emit(event.RequestEndEvent{
+		method:      req.method.str()
+		path:        url.path
+		status_code: req_ctx.resp.status_code
+		duration_ms: time.ticks() - start_ticks
+	}) or {}
 	return resp
 }
 
@@ -506,6 +524,7 @@ pub fn (mut app Application) graceful_shutdown() ! {
 	for interrupt_fn in app.interrupts {
 		interrupt_fn()!
 	}
+	app.emit(event.ServerShutdownEvent{}) or {}
 }
 
 @[inline]
@@ -562,5 +581,9 @@ pub fn (mut app Application) run() {
 	}
 
 	spawn app.graceful_shutdown()
+	app.emit(event.ServerStartEvent{
+		port:     app.cfg.port
+		app_name: app.cfg.app_name
+	}) or {}
 	app.Server.listen_and_serve()
 }

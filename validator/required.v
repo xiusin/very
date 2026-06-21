@@ -15,11 +15,29 @@ fn (m Required[T]) validate() ! {
 	}
 
 	$for field in T.fields {
-		$if field.typ is string {
-			if field.name == m.field.name {
+		if field.name == m.field.name {
+			$if field.typ is string {
 				if m.data.$(field.name).len == 0 {
 					return error(message)
 				}
+			} $else $if field.typ is int {
+				if m.data.$(field.name) == 0 {
+					return error(message)
+				}
+			} $else $if field.typ is i64 {
+				if m.data.$(field.name) == 0 {
+					return error(message)
+				}
+			} $else $if field.typ is u64 {
+				if m.data.$(field.name) == 0 {
+					return error(message)
+				}
+			} $else $if field.typ is f64 {
+				if m.data.$(field.name) == 0.0 {
+					return error(message)
+				}
+			} $else $if field.typ is bool {
+				// bool is always valid for required
 			}
 		}
 	}

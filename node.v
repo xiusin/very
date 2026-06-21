@@ -22,12 +22,12 @@ mut:
 
 pub fn (mut t Node) new_child(val string, path string, handler Handler, term bool, is_group bool) &Node {
 	node := &Node{
-		val: val
-		path: path
-		term: term
-		depth: t.depth + 1
+		val:      val
+		path:     path
+		term:     term
+		depth:    t.depth + 1
 		is_group: is_group
-		handler: handler
+		handler:  handler
 		children: map[string]&Node{}
 	}
 

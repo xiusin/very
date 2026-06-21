@@ -21,6 +21,14 @@ fn (m Number[T]) validate() ! {
 			if field.name == m.field.name && !re.matches_string(m.data.$(field.name)) {
 				return error(message)
 			}
+		} $else $if field.typ is int {
+			// numeric types are always valid numbers
+		} $else $if field.typ is i64 {
+			// numeric types are always valid numbers
+		} $else $if field.typ is u64 {
+			// numeric types are always valid numbers
+		} $else $if field.typ is f64 {
+			// numeric types are always valid numbers
 		}
 	}
 }

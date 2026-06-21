@@ -10,7 +10,7 @@ pub interface IValidator {
 const validators_ = new_validators()
 
 fn default_validator() &Validators {
-	return validator.validators_
+	return validators_
 }
 
 @[head]
@@ -36,74 +36,79 @@ pub fn register_validator(name string, v IValidator) {
 // validate data
 pub fn validate[T](data &T) ?[]IError {
 	mut errs := []IError{}
-	mut validators := []IValidator{}
 
 	$for field in T.fields {
 		rule_attr := field.attrs.filter(it.contains('validate'))
 		mut message_map := map[string]string{}
 		if rule_attr.len > 0 {
-			mut rules := rule_attr.first().trim_string_left('validate: ').split(',')
+			mut rules := rule_attr.first().trim_string_left('validate: ').trim("'").split(',')
 			message_attrs := field.attrs.filter(it.contains('message'))
 			if message_attrs.len > 0 {
-				messages := message_attrs.first().trim_string_left('message: ').split(',')
+				messages := message_attrs.first().trim_string_left('message: ').trim("'").split(',')
 				for message in messages {
 					key, value := message.trim_space().split_once('=')?
 					message_map[key] = value
 				}
 			}
 
-			for mut rule in rules {
-				rule = rule.trim_space()
-				mut validator_rule := rule
+			for rule in rules {
+				trimmed := rule.trim_space()
+				mut validator_rule := trimmed
 				mut pattern := ''
-				if rule.contains('=') {
-					validator_rule, pattern = rule.split_once('=') or { rule, '' }
+				if trimmed.contains('=') {
+					validator_rule, pattern = trimmed.split_once('=') or { trimmed, '' }
 				}
 				match validator_rule {
 					'min' {
-						validators << IValidator(&Min[T]{
-							field: field
+						v := Min[T]{
+							field:   field
 							message: message_map[validator_rule]
-							value: pattern
-							data: unsafe { data }
-						})
+							value:   pattern
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					'max' {
-						validators << IValidator(&Max[T]{
-							field: field
+						v := Max[T]{
+							field:   field
 							message: message_map[validator_rule]
-							value: pattern
-							data: unsafe { data }
-						})
+							value:   pattern
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					'required' {
-						validators << IValidator(&Required[T]{
-							field: field
+						v := Required[T]{
+							field:   field
 							message: message_map[validator_rule]
-							data: unsafe { data }
-						})
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					'regexp' {
-						validators << IValidator(&Regexp[T]{
-							field: field
+						v := Regexp[T]{
+							field:   field
 							message: message_map[validator_rule]
-							value: pattern
-							data: unsafe { data }
-						})
+							value:   pattern
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					'number' {
-						validators << IValidator(&Number[T]{
-							field: field
+						v := Number[T]{
+							field:   field
 							message: message_map[validator_rule]
-							data: unsafe { data }
-						})
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					'url' {
-						validators << IValidator(&Url[T]{
-							field: field
+						v := Url[T]{
+							field:   field
 							message: message_map[validator_rule]
-							data: unsafe { data }
-						})
+							data:    unsafe { data }
+						}
+						v.validate() or { errs << err }
 					}
 					else {
 						return [error('no validator ${validator_rule}')] // auto find
@@ -112,9 +117,5 @@ pub fn validate[T](data &T) ?[]IError {
 			}
 		}
 	}
-	for mut validator in validators {
-		validator.validate() or { errs << err }
-	}
-
 	return errs
 }
