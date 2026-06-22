@@ -78,7 +78,7 @@
   - [x] SubTask 12.2: `v build .` 无警告
   - [x] SubTask 12.3: examples 编译通过
 - [x] Task 13: 自审 checklist.md 全部勾选
-- [ ] Task 14: 提交到远程并生成 PR
+- [x] Task 14: 提交到远程并生成 PR
 
 # Task Dependencies
 - Task 2 依赖 Task 1
