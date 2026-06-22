@@ -2,6 +2,7 @@ module main
 
 import xiusin.very
 import xiusin.very.middleware
+import xiusin.very.event
 import log
 import rand
 
@@ -31,7 +32,7 @@ pub fn (mut app App) app_inject() ! {
 	println('${ptr_str(app.logger_)}')
 	app.logger_.set_level(log.Level.debug)
 	app.logger_.info('logger_ xxx ${*app.i_int} - ${ptr_str(app.logger_)} - ${ptr_str(app.i_int)}')
-	app.text('app inject ${*app.i_int}')
+	app.text('app inject ${*app.i_int}')!
 }
 
 @['/html'; get]
@@ -53,25 +54,29 @@ fn main() {
 		println('\nweb server closed!')
 	})
 
+	// Register singleton services in the DI container
 	{
 		a := 'hello world'
 		i := 100
 		app.inject_on(&a, 'string')
 		app.inject_on(&i, 'int')
 	}
+
+	// Event listeners for server lifecycle
+	app.on('ServerStart', fn (e event.Event) ! {
+		println('Server started!')
+	})
+	app.on('RequestStart', fn (e event.Event) ! {
+		println('Incoming request')
+	})
+
 	// /hello/ => hello,
 	// /hello/xiusin => hello, xiusin
 	app.get('/hello/*name', fn (mut ctx very.Context) ! {
 		ctx.html('<h1>Hello, ${ctx.param('name')}!</h1>')
 	})
 
-	// , middleware.favicon(
-	// 		data: $embed_file('favicon.ico', .zlib).to_bytes()
-	// 	)
-	app.use(middleware.compress, middleware.cors()) // use middleware
-	// mut asset := byte_file_data()
-	// app.embed_statics('/dist', mut asset)
-	// app.statics("/", "dist", "index.html") or {}
+	app.use(middleware.compress, middleware.cors())
 	app.mount[App]()
 	app.run()
 }

@@ -1,7 +1,5 @@
 module di
 
-import v.reflection
-
 // Box is an internal helper used to heap-allocate interface values so they can
 // be stored as voidptr and later retrieved as &T.
 struct Box[T] {
@@ -318,8 +316,10 @@ pub fn get[T](name string) !&T {
 
 // inject_on registers a singleton - old API.
 pub fn inject_on[T](ptr T, names ...string) {
-	if !T.name.starts_with('&') && reflection.type_of(ptr).sym.kind != reflection.VKind.interface {
-		panic('argument must be of reference type.')
+	$if T !is $interface {
+		if !T.name.starts_with('&') {
+			panic('argument must be of reference type.')
+		}
 	}
 	name := if names.len > 0 {
 		names[0]
@@ -327,5 +327,5 @@ pub fn inject_on[T](ptr T, names ...string) {
 		T.name
 	}
 	mut c := default_container()
-	c.set(new_service(name, voidptr(ptr), T.name))
+	c.set(new_service(name, unsafe { voidptr(ptr) }, T.name))
 }

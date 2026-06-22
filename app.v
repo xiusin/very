@@ -10,7 +10,6 @@ import xiusin.very.di
 import xiusin.very.event
 import xiusin.very.session
 import xiusin.vcolor
-import v.reflection
 import dl.loader
 
 pub type Handler = fn (mut ctx Context) !
@@ -280,8 +279,7 @@ fn (mut app GroupRouter) parse_group_attr[T]() string {
 fn (mut app GroupRouter) mountable[T]() bool {
 	$for field in T.fields {
 		$if field.name == 'Context' {
-			t := reflection.get_type(field.typ) or { reflection.Type{} }
-			if t.sym.name == 'xiusin.very.Context' {
+			$if field.typ is Context {
 				return true
 			}
 		}
@@ -296,14 +294,10 @@ fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
 		$if field.typ !is Context {
 			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
 			if services.len == 1 {
-				sym := reflection.get_type_symbol(field.typ) or {
-					reflection.TypeSymbol{
-						kind: .placeholder
-					}
-				}
-				is_interface := sym.kind == reflection.VKind.interface
-
-				if field.indirections == 1 || is_interface { // only pointer or interface
+				// Allow pointer fields (indirections == 1) and interface/value
+				// fields (indirections == 0). Interfaces in V have 0
+				// indirections; the DI container handles type checking.
+				if field.indirections <= 1 {
 					service := app.di.get_service(services[0]) or { panic(err) }
 					injected_fields[field.name] = service.get_instance()
 				} else {
@@ -396,9 +390,8 @@ fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields ma
 					$if field.typ !is Context {
 						if field.name in injected_fields {
 							unsafe {
-								field_ptr := &voidptr(&ctrl.$(field.name))
-								*field_ptr = injected_fields[field.name]
-								_ = field_ptr
+								vpp := injected_fields[field.name]
+								C.memcpy(&ctrl.$(field.name), &vpp, sizeof(voidptr))
 							}
 						}
 					}
