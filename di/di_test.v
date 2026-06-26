@@ -159,3 +159,166 @@ fn test_register_factory() {
 	got2 := c.get[Counter]('factory_counter')!
 	assert voidptr(got) == voidptr(got2)
 }
+
+// ---- Auto-injection tests ----
+
+struct Repo {
+mut:
+	data string
+}
+
+struct UserService {
+mut:
+	repo &Repo = unsafe { nil } @[inject: 'repo']
+	name string
+}
+
+fn test_auto_inject() {
+	mut c := new_container()
+	repo := &Repo{
+		data: 'hello'
+	}
+	c.register_singleton[&Repo](repo, 'repo')
+
+	mut svc := &UserService{}
+	assert svc.name == ''
+
+	// inject_fields_safe should resolve the @[inject: 'repo'] field
+	inject_fields_safe[UserService](mut svc, mut c)
+
+	assert svc.repo.data == 'hello'
+}
+
+// inject_fields (error-returning variant) should also work
+fn test_inject_fields() {
+	mut c := new_container()
+	repo := &Repo{
+		data: 'world'
+	}
+	c.register_singleton[&Repo](repo, 'repo')
+
+	mut svc := &UserService{}
+	inject_fields[UserService](mut svc, mut c)!
+
+	assert svc.repo.data == 'world'
+}
+
+// inject_fields should return error when bean is missing
+fn test_inject_missing_bean() {
+	mut c := new_container()
+	mut svc := &UserService{}
+
+	inject_fields[UserService](mut svc, mut c) or {
+		assert err.msg().contains('not found')
+		return
+	}
+	assert false, 'should have returned error for missing bean'
+}
+
+// inject_fields_safe should silently skip missing beans (no error)
+fn test_inject_safe_missing_bean() {
+	mut c := new_container()
+	mut svc := &UserService{}
+
+	// Should not panic — just leaves repo as nil
+	inject_fields_safe[UserService](mut svc, mut c)
+
+	assert isnil(svc.repo)
+}
+
+fn test_parse_inject_name() {
+	// Without quotes
+	assert parse_inject_name(['inject: mybean']) == 'mybean'
+	assert parse_inject_name(['inject: logger', 'other']) == 'logger'
+	assert parse_inject_name([]) == ''
+	assert parse_inject_name(['no_inject']) == ''
+	// With single quotes (how V stores @[inject: 'repo'])
+	assert parse_inject_name(["inject: 'repo'"]) == 'repo'
+	assert parse_inject_name(["inject: \"logger\""]) == 'logger'
+	// Multiple inject attrs returns empty (ambiguous)
+	assert parse_inject_name(['inject: a', 'inject: b']) == ''
+}
+
+fn test_has_inject_attr() {
+	assert has_inject_attr(['inject: x'])
+	assert has_inject_attr(["inject: 'x'"])
+	assert !has_inject_attr([])
+	assert !has_inject_attr(['other'])
+}
+
+// ---- Annotation service registration tests ----
+
+@[service]
+struct AnnotationService {
+mut:
+	repo &Repo = unsafe { nil } @[inject: 'repo']
+}
+
+@[service: 'custom_svc']
+@[scope: 'prototype']
+struct CustomNamedService {
+mut:
+	label string
+}
+
+fn test_register_service_default() {
+	mut c := new_container()
+	repo := &Repo{
+		data: 'svc-data'
+	}
+	c.register_singleton[&Repo](repo, 'repo')
+
+	c.register_service[AnnotationService]()!
+	svc := c.get[AnnotationService]('AnnotationService')!
+	assert svc.repo.data == 'svc-data'
+}
+
+fn test_register_service_custom_name_and_scope() {
+	mut c := new_container()
+	c.register_service[CustomNamedService]()!
+
+	// Registered under custom name
+	assert c.has('custom_svc')
+
+	// Prototype scope: each get returns a new instance
+	s1 := c.get[CustomNamedService]('custom_svc')!
+	s2 := c.get[CustomNamedService]('custom_svc')!
+	assert voidptr(s1) != voidptr(s2)
+}
+
+// ---- Circular dependency tests ----
+
+struct CircleA {
+mut:
+	b &CircleB = unsafe { nil } @[inject: 'circleB']
+}
+
+struct CircleB {
+mut:
+	a &CircleA = unsafe { nil } @[inject: 'circleA']
+}
+
+fn test_circular_dependency() {
+	mut c := new_container()
+	c.register[CircleA](.singleton, 'circleA')!
+	c.register[CircleB](.singleton, 'circleB')!
+
+	a := c.get[CircleA]('circleA')!
+	// a.b should be resolved (early reference of B)
+	assert !isnil(a.b)
+	// a.b.a should point back to a (circular reference resolved)
+	assert voidptr(a.b.a) == voidptr(a)
+}
+
+// Struct with no inject fields — register + get should work fine
+struct PlainService {
+mut:
+	value int
+}
+
+fn test_register_plain_struct() {
+	mut c := new_container()
+	c.register[PlainService](.singleton, 'plain')!
+	s := c.get[PlainService]('plain')!
+	assert s.value == 0
+}

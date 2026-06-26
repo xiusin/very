@@ -26,16 +26,30 @@ pub struct Bean {
 pub:
 	definition BeanDefinition
 mut:
-	instance    voidptr = unsafe { nil }
-	initialized bool
+	instance      voidptr = unsafe { nil }
+	initialized   bool
+	initializing  bool // true while factory+injection is in progress (early reference for circular deps)
 }
 
 pub fn new_bean(def BeanDefinition, instance voidptr) &Bean {
 	return &Bean{
-		definition:  def
-		instance:    instance
-		initialized: instance != unsafe { nil }
+		definition:   def
+		instance:     instance
+		initialized:  instance != unsafe { nil }
 	}
+}
+
+// publish_early_reference marks the bean as "initializing" and stores the instance
+// so that circular dependencies can resolve to this partial instance.
+pub fn (mut b Bean) publish_early_reference(instance voidptr) {
+	b.instance = instance
+	b.initializing = true
+}
+
+// finish_initialization marks the bean as fully initialized.
+pub fn (mut b Bean) finish_initialization() {
+	b.initializing = false
+	b.initialized = true
 }
 
 // Compat: Service is an alias for Bean (backward compatibility)

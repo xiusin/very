@@ -85,6 +85,79 @@ pub fn (mut c Container) register_lazy[T](factory fn () &T, name ...string) {
 	}
 }
 
+// register registers a service struct type with auto-injection.
+// The container creates an instance of T, publishes an early reference
+// (for circular dependency resolution), then injects all @[inject: 'name']
+// annotated fields. This is the Spring @Service equivalent.
+//
+// For singleton scope (default), the instance is created on first get.
+// For prototype scope, a new instance + injection happens on each get[T].
+pub fn (mut c Container) register[T](scope BeanScope, name ...string) ! {
+	n := if name.len > 0 { name[0] } else { T.name.split('.').last() }
+
+	// Factory creates instance, publishes early reference (singleton only),
+	// then injects fields. Early reference allows circular deps (A->B->A).
+	// Prototype scope skips publish_early to avoid corrupting shared bean state.
+	factory_fn := fn [mut c, n, scope] [T]() voidptr {
+		mut instance := &T{}
+		if scope == .singleton {
+			c.publish_early(n, voidptr(instance))
+		}
+		inject_fields_safe[T](mut instance, mut c)
+		return voidptr(instance)
+	}
+
+	def := BeanDefinition{
+		name:    n
+		typ:     T.name
+		scope:   scope
+		factory: factory_fn
+	}
+	bean := new_bean(def, unsafe { nil })
+	lock c.beans {
+		c.beans[n] = bean
+	}
+}
+
+// publish_early updates a bean's instance and marks it as "initializing".
+// This publishes an early reference that circular dependencies can resolve to.
+// Called by register[T]'s factory before field injection.
+pub fn (mut c Container) publish_early(name string, instance voidptr) {
+	lock c.beans {
+		if name in c.beans {
+			mut bean := unsafe { c.beans[name] }
+			bean.instance = instance
+			bean.initializing = true
+		}
+	}
+}
+
+// register_service reads @[service] and optional @[scope] attributes from T
+// and registers it in the container with auto-injection.
+// Example:
+//   @[service]
+//   @[scope: 'prototype']
+//   struct UserService { ... @[inject: 'repo'] }
+pub fn (mut c Container) register_service[T]() ! {
+	mut n := T.name.split('.').last()
+	mut scope := BeanScope.singleton
+
+	$for f in T.attributes {
+		if f.name == 'service' && f.has_arg && f.arg.len > 0 {
+			n = f.arg
+		}
+		if f.name == 'scope' && f.has_arg {
+			if f.arg == 'prototype' {
+				scope = .prototype
+			} else if f.arg == 'singleton' {
+				scope = .singleton
+			}
+		}
+	}
+
+	c.register[T](scope, n)!
+}
+
 // bind_instance binds an interface to a concrete instance (registers under interface type name).
 pub fn (mut c Container) bind_instance[T](instance T, name ...string) {
 	n := if name.len > 0 { name[0] } else { T.name }
@@ -109,6 +182,8 @@ pub fn (mut c Container) bind_instance[T](instance T, name ...string) {
 }
 
 // get retrieves a bean by name with type checking.
+// Supports circular dependency resolution via early references:
+// if a bean is currently being initialized, its partial instance is returned.
 pub fn (mut c Container) get[T](name string) !&T {
 	mut bean := &Bean(unsafe { nil })
 	mut found := false
@@ -123,6 +198,18 @@ pub fn (mut c Container) get[T](name string) !&T {
 			return c.parent.get[T](name)
 		}
 		return error('bean not found: ${name}')
+	}
+
+	// Circular dependency: if the bean is currently being initialized,
+	// return the early reference (partial instance). This allows A->B->A
+	// field-injection cycles to resolve gracefully.
+	if bean.initializing {
+		$if T is $interface {
+			box := unsafe { &Box[T](bean.instance) }
+			return &box.val
+		} $else {
+			return unsafe { &T(bean.instance) }
+		}
 	}
 
 	// Type check (normalised: strip leading '&' so '&Foo' matches 'Foo')
@@ -155,12 +242,15 @@ pub fn (mut c Container) get[T](name string) !&T {
 
 	// Singleton: create on first get if not yet initialized and a factory is present
 	if !bean.initialized && def.factory != unsafe { nil } {
+		// Publish early reference BEFORE calling factory, so circular deps
+		// can resolve. The factory itself may trigger injection that loops back.
+		bean.publish_early_reference(unsafe { nil }) // placeholder, factory will provide real instance
 		instance := def.factory()
+		bean.instance = instance
 		if def.init_method != unsafe { nil } {
 			def.init_method(instance)!
 		}
-		bean.instance = instance
-		bean.initialized = true
+		bean.finish_initialization()
 	}
 
 	// Return cached singleton instance
@@ -262,12 +352,18 @@ pub fn (mut c Container) exists(name string) bool {
 }
 
 // get_voidptr returns the raw instance pointer - old API.
+// Supports early reference for circular dependency resolution.
 pub fn (mut c Container) get_voidptr(name string) !voidptr {
 	service := c.get_service(name)!
+	// If the bean is currently being initialized, return the early reference
+	if service.initializing {
+		return service.instance
+	}
 	return service.instance
 }
 
 // get_service returns the Service (Bean) by name - old API.
+// Searches this container first, then parent. Supports early references.
 pub fn (mut c Container) get_service(name string) !&Service {
 	lock c.beans {
 		if name in c.beans {
@@ -278,6 +374,69 @@ pub fn (mut c Container) get_service(name string) !&Service {
 		return c.parent.get_service(name)
 	}
 	return error('Unable to find service `${name}`')
+}
+
+// get_service_or_nil returns the Service by name, or nil if not found.
+// Does NOT use Result/Option, so it's safe to call inside generic functions
+// (avoids V 0.5.1 `or` block `err` generation bug in generics).
+pub fn (mut c Container) get_service_or_nil(name string) &Service {
+	lock c.beans {
+		if name in c.beans {
+			return unsafe { c.beans[name] }
+		}
+	}
+	if c.parent != unsafe { nil } {
+		return c.parent.get_service_or_nil(name)
+	}
+	return unsafe { nil }
+}
+
+// resolve_instance_or_nil looks up a bean by name and ensures its instance
+// is created (triggering the factory if needed). Returns nil if not found.
+//
+// This is the core dependency-resolution primitive used by inject_fields_safe.
+// It handles:
+//   - Already-initialized singletons: return cached instance
+//   - Circular dependencies: if bean.initializing, return early reference
+//   - Lazy/factory singletons: create on first access, publish early reference
+//   - Prototype: call factory each time (no caching)
+//
+// Does NOT use Result/Option (avoids V 0.5.1 generic `or` block bug).
+pub fn (mut c Container) resolve_instance_or_nil(name string) voidptr {
+	mut service := &Bean(unsafe { nil })
+	mut found := false
+	lock c.beans {
+		if name in c.beans {
+			service = unsafe { c.beans[name] }
+			found = true
+		}
+	}
+	if !found {
+		if c.parent != unsafe { nil } {
+			return c.parent.resolve_instance_or_nil(name)
+		}
+		return unsafe { nil }
+	}
+	// Circular dependency: bean is currently being initialized — return early reference
+	if service.initializing {
+		return service.instance
+	}
+	def := service.definition
+	// Prototype: always call factory, don't cache
+	if def.scope == .prototype {
+		if def.factory == unsafe { nil } {
+			return unsafe { nil }
+		}
+		return def.factory()
+	}
+	// Singleton: create on first access if factory exists and not yet initialized
+	if !service.initialized && def.factory != unsafe { nil } {
+		service.publish_early_reference(unsafe { nil })
+		instance := def.factory()
+		service.instance = instance
+		service.finish_initialization()
+	}
+	return service.instance
 }
 
 // ---- Builder type alias (backward compat) ----

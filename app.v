@@ -115,6 +115,24 @@ pub fn (mut app Application) bind_instance[T](instance T, name ...string) {
 	app.di.bind_instance(instance, ...name)
 }
 
+// register registers a service struct type with auto-injection.
+// The container creates an instance of T and injects all @[inject: 'name'] fields.
+// This is the Spring @Service equivalent.
+pub fn (mut app Application) register[T](scope di.BeanScope, name ...string) ! {
+	app.di.register[T](scope, ...name)!
+}
+
+// register_service reads @[service] and @[scope] attributes from T and auto-registers it.
+// Example:
+//   @[service]
+//   struct UserService {
+//       repo &UserRepo @[inject: 'user_repo']
+//   }
+//   app.register_service[UserService]()!
+pub fn (mut app Application) register_service[T]() ! {
+	app.di.register_service[T]()!
+}
+
 pub fn (mut app Application) on(event_name string, listener event.EventListener) {
 	app.event_bus.on(event_name, listener)
 }
@@ -287,58 +305,36 @@ fn (mut app GroupRouter) mountable[T]() bool {
 	return false
 }
 
-fn (mut app GroupRouter) get_injected_fields[T]() map[string]voidptr {
-	di_flag := 'inject: '
-	mut injected_fields := map[string]voidptr{}
-	$for field in T.fields {
-		$if field.typ !is Context {
-			services := field.attrs.filter(it.contains(di_flag)).map(it.replace(di_flag, ''))
-			if services.len == 1 {
-				// Allow pointer fields (indirections == 1) and interface/value
-				// fields (indirections == 0). Interfaces in V have 0
-				// indirections; the DI container handles type checking.
-				if field.indirections <= 1 {
-					service := app.di.get_service(services[0]) or { panic(err) }
-					injected_fields[field.name] = service.get_instance()
-				} else {
-					println(vcolor.red_string('[WARN] inject field must be a ref field: ${field.name}'))
-				}
-			}
-		}
-	}
-	return injected_fields
-}
-
 fn (mut app GroupRouter) parse_attrs(name string, attrs []string) !([]http.Method, string) {
 	if attrs.len == 0 {
 		return [http.Method.get], ''
 	}
-	mut x := attrs.clone()
 	mut methods := []http.Method{}
 	mut path := ''
+	mut leftover := []string{}
 
-	for i := 0; i < x.len; {
-		attr := x[i]
+	for attr in attrs {
 		attru := attr.to_upper()
 		m := http.method_from_str(attru)
+		// Recognised HTTP method?
 		if attru == 'GET' || m != .get {
 			methods << m
-			x.delete(i)
 			continue
 		}
+		// Route path?
 		if attr.starts_with('/') {
 			if path != '' {
 				return IError(http.MultiplePathAttributesError{})
 			}
 			path = attr
-			x.delete(i)
 			continue
 		}
-		i++
+		// Unknown attribute
+		leftover << attr
 	}
-	if x.len > 0 {
+	if leftover.len > 0 {
 		return IError(http.UnexpectedExtraAttributeError{
-			attributes: x
+			attributes: leftover
 		})
 	}
 	if methods.len == 0 {
@@ -355,7 +351,7 @@ pub fn (mut app GroupRouter) mount[T]() {
 		panic(error('Must pass in a structure that implements `very.contracts.Controller`'))
 	}
 
-	injected_fields, route_prefix := app.get_injected_fields[T](), app.parse_group_attr[T]()
+	route_prefix := app.parse_group_attr[T]()
 
 	mut router := unsafe { &app }
 	if route_prefix.len > 0 {
@@ -372,45 +368,40 @@ pub fn (mut app GroupRouter) mount[T]() {
 				http_methods << http.Method.options
 			}
 
-			method := method_
-			for ano_method in http_methods {
-				router.add(ano_method, route_path, app.warp_handler[T](method, injected_fields))
+			// Only register handler if method is pub and takes no args
+			$if method_.is_pub && method_.typ is fn () {
+				for ano_method in http_methods {
+					router.add(ano_method, route_path, app.warp_handler[T](method_))
+				}
 			}
 		}
 	}
 }
 
-fn (mut app GroupRouter) warp_handler[T](method FunctionData, injected_fields map[string]voidptr) Handler {
-	return fn [method, injected_fields, mut app] [T](mut ctx Context) ! {
+fn (mut app GroupRouter) warp_handler[T](method FunctionData) Handler {
+	return fn [method, mut app] [T](mut ctx Context) ! {
 		mut ctrl := T{}
 		ctrl.Context = ctx
+		// Auto-inject @[inject: 'name'] fields from DI container per-request.
+		// Uses di.inject_fields_safe which supports circular dependency resolution.
+		// Safe variant used to avoid V 0.5.1 generic closure ! propagation bug.
+		di.inject_fields_safe[T](mut ctrl, mut app.di)
+		// init hook
+		if !isnil(app.init_method) {
+			unsafe {
+				app.init_method(voidptr(&ctrl)) or {}
+			}
+		}
+		// call the handler method
 		$for method__ in T.methods {
 			if method__.name == method.name {
-				$for field in T.fields {
-					$if field.typ !is Context {
-						if field.name in injected_fields {
-							unsafe {
-								vpp := injected_fields[field.name]
-								C.memcpy(&ctrl.$(field.name), &vpp, sizeof(voidptr))
-							}
-						}
-					}
-				}
-				$if method__.is_pub && method__.typ is fn () {
-					if !isnil(app.init_method) {
-						unsafe {
-							app.init_method(voidptr(&ctrl)) or {}
-						}
-					}
-					ctrl.$method() or { return err }
-					if !isnil(app.deinit_method) {
-						unsafe {
-							app.deinit_method(voidptr(&ctrl)) or {}
-						}
-					}
-				} $else {
-					return error('the method `${method.name}` is not available')
-				}
+				ctrl.$method() or { return error('handler `${method.name}` failed') }
+			}
+		}
+		// deinit hook
+		if !isnil(app.deinit_method) {
+			unsafe {
+				app.deinit_method(voidptr(&ctrl)) or {}
 			}
 		}
 	}
