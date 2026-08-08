@@ -37,6 +37,8 @@ fn (m Min[T]) validate() ! {
 				block = m.data.$(field.name).u32() < check_value
 			} $else $if field.typ is u64 {
 				block = m.data.$(field.name).u64() < check_value
+			} $else $if field.typ is f64 {
+				block = m.data.$(field.name) < check_value
 			} $else {
 				return error('min no support ${field.typ}')
 			}

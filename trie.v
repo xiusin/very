@@ -11,7 +11,7 @@ const nul = ''
 pub fn new_trie() &Trier {
 	return &Trier{
 		root: &Node{
-			depth: 0
+			depth:    0
 			children: map[string]&Node{}
 		}
 		size: 0
@@ -38,6 +38,7 @@ pub fn (mut t Trier) add(key string, handler Handler, mws []Handler) &Node {
 					'*', ':' { true }
 					else { false }
 				}
+
 				mut param_name := ''
 				if is_pattern {
 					if chr == ':' {
@@ -57,7 +58,7 @@ pub fn (mut t Trier) add(key string, handler Handler, mws []Handler) &Node {
 			}
 		}
 
-		return node.new_child(very.nul, key, handler, true, false)
+		return node.new_child(nul, key, handler, true, false)
 	}
 }
 
@@ -70,10 +71,10 @@ pub fn (mut t Trier) find(key string) (&Node, map[string]string, bool) {
 			return nil, map[string]string{}, false
 		}
 		children := node.children()
-		if very.nul !in children { // 还没有初始化过
+		if nul !in children { // 还没有初始化过
 			return nil, map[string]string{}, false
 		}
-		child := children[very.nul]
+		child := children[nul]
 		if !child.term {
 			return nil, map[string]string{}, false
 		}

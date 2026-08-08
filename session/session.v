@@ -2,32 +2,60 @@ module session
 
 import rand
 
+// Session represents a single user session. It delegates persistence to a
+// SessionStore (in-memory by default, replaceable via set_default_store or
+// new_session_with_store).
 @[head]
 pub struct Session {
 mut:
-	id   string
-	data map[string]string
+	id    string
+	data  map[string]string
+	store &MemorySessionStore = unsafe { nil }
 }
 
+// new_session creates a session with the given id, loading any existing
+// data from the default store.
 pub fn new_session(id string) &Session {
 	mut sess := &Session{
-		id: id
+		id:    id
+		store: default_session_store()
 	}
-
 	sess.load()
 	return sess
 }
 
-fn (mut s Session) set_id(id string) {
-	s.id = id
+// new_session_with_store creates a session backed by an explicit store.
+pub fn new_session_with_store(id string, store &MemorySessionStore) &Session {
+	mut sess := &Session{
+		id:    id
+		store: store
+	}
+	sess.load()
+	return sess
+}
+
+fn (mut s Session) set_store(store &MemorySessionStore) {
+	s.store = store
+}
+
+// set_session_store sets the backing store for this session. Allows the
+// application to plug in a custom store (e.g. Redis-backed) per session.
+pub fn (mut s Session) set_session_store(store &MemorySessionStore) {
+	s.store = store
 }
 
 fn (mut s Session) load() {
-	s.data = store.get(s.get_id())
+	if s.store == unsafe { nil } {
+		s.store = default_session_store()
+	}
+	s.data = s.store.get(s.get_id())
 }
 
 pub fn (mut s Session) sync() {
-	store.set(s.get_id(), s.data.clone(), 3600)
+	if s.store == unsafe { nil } {
+		s.store = default_session_store()
+	}
+	s.store.set(s.get_id(), s.data.clone(), 3600)
 }
 
 fn (mut s Session) all() map[string]string {

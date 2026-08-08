@@ -16,8 +16,8 @@ mut:
 pub fn new_request(req &http.Request, url urllib.URL) &Request {
 	return &Request{
 		Request: req
-		url_: url
-		query: http.parse_form(url.raw_query)
+		url_:    url
+		query:   http.parse_form(url.raw_query)
 	}
 }
 

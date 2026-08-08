@@ -3,17 +3,19 @@ module very
 import log
 import json
 import net.http
-import very.session
-import very.validator
+import xiusin.very.di
+import xiusin.very.session
+import xiusin.very.validator
 import context
 
 pub struct Context {
 mut:
-	app        &Application
-	mw_index   int = -1
-	is_stopped bool
-	params     map[string]string
-	values     map[string]Val = map[string]Val{}
+	app          &Application
+	di_container &di.Container = unsafe { nil } // request-scoped child container, nil if request scope disabled
+	mw_index     int           = -1
+	is_stopped   bool
+	params       map[string]string
+	values       map[string]Val = map[string]Val{}
 pub mut:
 	req     &Request
 	resp    &http.Response
@@ -21,16 +23,15 @@ pub mut:
 	handler Handler = unsafe { nil }
 	sess    session.Session
 	logger  log.Logger
-	ctx    	context.Context = context.background()
+	ctx     context.Context = context.background()
 }
 
-pub type Val = []byte
+pub type Val = []u8
 	| []f64
 	| []i64
 	| []int
 	| []rune
 	| []string
-	| byte
 	| f64
 	| i64
 	| i8
@@ -43,9 +44,9 @@ pub type Val = []byte
 
 fn new_context() &Context {
 	return &Context{
-		resp: unsafe { nil }
-		req: unsafe { nil }
-		app: unsafe { nil }
+		resp:   unsafe { nil }
+		req:    unsafe { nil }
+		app:    unsafe { nil }
 		logger: unsafe { nil }
 	}
 }
@@ -58,6 +59,7 @@ pub fn (mut ctx Context) reset(req &Request, resp &http.Response) {
 	ctx.is_stopped = false
 	ctx.mw_index = -1
 	ctx.mws.clear()
+	ctx.di_container = unsafe { nil }
 }
 
 pub fn (mut ctx Context) value(key string, default_value ...Val) !Val {
@@ -179,6 +181,11 @@ pub fn (mut ctx Context) body_parse[T]() !T {
 
 @[inline]
 pub fn (mut ctx Context) di[T](name string) !&T {
+	if !isnil(ctx.di_container) {
+		if ctx.di_container.has(name) {
+			return ctx.di_container.get[T](name)
+		}
+	}
 	return ctx.app.di.get[T](name)
 }
 
