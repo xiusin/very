@@ -1,3 +1,5 @@
+
+
 # very [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/xiusin/very)
 
 Express inspired web framework written in V with `net.http.server` module. 
@@ -104,7 +106,7 @@ fn main() {
 	})
 
 	app.mount[DemoController]()
-	app.statics('/', 'statics', 'index.html')
+	app.statics('/', 'examples', 'example.html')
 
     // mut asset := very.Asset{}
     // app.embed_statics('/dist', asset) // see examples/bind_bin_data.vsh
